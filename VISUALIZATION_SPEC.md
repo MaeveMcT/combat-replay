@@ -1,5 +1,12 @@
 # Combat Replay Visualization Specification
 
+
+# NEW PRIORITIES- REMOVE THIS SECTION WHEN DONE
+some sort of healthbar visualisation for actors that recently took damage
+can we get player names associated with the player actors rather than numbering them?
+for collaborative replays, we'd need to sync somehow. we could use the current server tick as a synchronizsation point
+
+
 ## Status
 
 Agreed product direction for the first major visualization pass. This document describes the target experience, not the current implementation.

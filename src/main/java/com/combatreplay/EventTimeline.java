@@ -47,7 +47,8 @@ final class EventTimeline extends JSlider
 		int width = Math.max(1, getWidth() - 16);
 		for (int tick = 0; tick < recording.ticks.size(); tick++)
 		{
-			Color category = markerColor(recording.ticks.get(tick));
+			Color category = markerColor(recording.ticks.get(tick),
+				tick == 0 ? null : recording.ticks.get(tick - 1));
 			if (category != null)
 			{
 				int x = 8 + (int) Math.round(tick * width / (double) (recording.ticks.size() - 1));
@@ -57,7 +58,7 @@ final class EventTimeline extends JSlider
 		}
 	}
 
-	private static Color markerColor(RecordedTick tick)
+	private static Color markerColor(RecordedTick tick, RecordedTick previous)
 	{
 		boolean inventory = tick.containerChanges != null && !tick.containerChanges.isEmpty();
 		for (RecordedEvent event : tick.events)
@@ -72,6 +73,35 @@ final class EventTimeline extends JSlider
 				default: break;
 			}
 		}
+		if (previous != null)
+		{
+			for (ActorSnapshot actor : tick.actors)
+			{
+				if (!"PLAYER".equals(actor.kind) || "You".equals(actor.label)) continue;
+				ActorSnapshot old = actor(previous, actor.key);
+				if (old != null && !java.util.Objects.equals(old.overheadIcon, actor.overheadIcon))
+					return new Color(80, 180, 255);
+				if (old != null && !sameItems(old.visibleEquipment, actor.visibleEquipment))
+					return new Color(255, 215, 80);
+			}
+		}
 		return inventory ? new Color(255, 215, 80) : null;
+	}
+
+	private static ActorSnapshot actor(RecordedTick tick, String key)
+	{
+		for (ActorSnapshot actor : tick.actors) if (key.equals(actor.key)) return actor;
+		return null;
+	}
+
+	private static boolean sameItems(java.util.List<ItemSnapshot> left, java.util.List<ItemSnapshot> right)
+	{
+		if (left.size() != right.size()) return false;
+		for (int index = 0; index < left.size(); index++)
+		{
+			ItemSnapshot a = left.get(index), b = right.get(index);
+			if (a.slot != b.slot || a.itemId != b.itemId || a.quantity != b.quantity) return false;
+		}
+		return true;
 	}
 }

@@ -385,7 +385,8 @@ final class RecordingFormat
 		{
 			String target = targetKey == null ? old == null ? null : old.targetKey : targetKey.isEmpty() ? null : targetKey;
 			List<ItemSnapshot> equipment = visibleEquipment == null
-				? old.visibleEquipment : decodeItems(visibleEquipment, itemNames);
+				? old == null ? Collections.emptyList() : old.visibleEquipment
+				: decodeItems(visibleEquipment, itemNames);
 			String icon = overheadIcon == null ? old == null ? null : old.overheadIcon
 				: overheadIcon.isEmpty() ? null : overheadIcon;
 			return new ActorSnapshot(key, kind == null ? old.kind : kind, label == null ? old.label : label,

@@ -262,10 +262,28 @@ final class ReplayMapPanel extends JPanel
 	{
 		RecordedTick tick = currentTick(); Map<String, ActorSnapshot> actors = byKey(tick); Map<String, Integer> rows = new HashMap<>();
 		ActorSnapshot local = actor(tick, findLocalKey(tick));
-		int switched = tickIndex > 0 ? changedSlots(recording.ticks.get(tickIndex - 1).equipment, tick.equipment) : 0;
-		if (local != null && switched > 0)
+		if (tickIndex > 0)
 		{
-			drawTag(g, local, switched + "-slot gear switch", new Color(255, 205, 65), rows, tick);
+			RecordedTick previous = recording.ticks.get(tickIndex - 1);
+			for (ActorSnapshot player : tick.actors)
+			{
+				if (!"PLAYER".equals(player.kind)) continue;
+				ActorSnapshot old = actor(previous, player.key);
+				if (old == null) continue;
+				int switched = "You".equals(player.label)
+					? changedSlots(previous.equipment, tick.equipment)
+					: changedSlots(old.visibleEquipment, player.visibleEquipment);
+				if (switched > 0)
+				{
+					drawTag(g, player, ("You".equals(player.label) ? "" : "visible ")
+						+ switched + "-slot gear switch", new Color(255, 205, 65), rows, tick);
+				}
+				if (!java.util.Objects.equals(old.overheadIcon, player.overheadIcon))
+				{
+					drawTag(g, player, player.overheadIcon == null ? "protection prayer off"
+						: pretty(player.overheadIcon) + " on", new Color(100, 190, 255), rows, tick);
+				}
+			}
 		}
 		for (RecordedEvent event : tick.events)
 		{
