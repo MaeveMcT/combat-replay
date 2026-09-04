@@ -124,7 +124,7 @@ final class ReplayViewerFrame extends JFrame
 		ActorSnapshot selected = actor(tick, selectedKey);
 		if (selected == null) { selectedKey = localKey(tick); selected = actor(tick, selectedKey); }
 		StringBuilder html = new StringBuilder("<html><body style='color:#ddd;background:#232323;font-family:sans-serif;margin:10px'>");
-		html.append("<h2 style='color:#ff981f'>").append(escape(selected == null ? "No actor selected" : selected.label)).append("</h2>");
+		html.append("<h2 style='color:#ff981f'>").append(escape(selected == null ? "No actor selected" : selected.displayName())).append("</h2>");
 		if (selected != null)
 		{
 			html.append("<b>").append(selected.kind).append("</b> &nbsp; Tile ").append(tick.baseX + selected.sceneX).append(", ").append(tick.baseY + selected.sceneY)
@@ -133,10 +133,12 @@ final class ReplayViewerFrame extends JFrame
 		}
 		if (selected != null && "PLAYER".equals(selected.kind))
 		{
-			if ("You".equals(selected.label))
+			if (selected.isLocalPlayer)
 			{
-				html.append("<h3>Resources</h3>HP ").append(tick.hitpoints).append(" / ").append(tick.maximumHitpoints).append("<br>Prayer ").append(tick.prayer).append(" / ").append(tick.maximumPrayer);
-				html.append("<h3>Active prayers</h3>").append(tick.activePrayers == null || tick.activePrayers.isEmpty() ? "None" : escape(prettyList(tick.activePrayers)));
+				html.append("<h3>Resources</h3>HP ").append(resource(tick.hitpoints, tick.maximumHitpoints))
+					.append("<br>Prayer ").append(resource(tick.prayer, tick.maximumPrayer));
+				html.append("<h3>Active prayers</h3>").append(tick.activePrayers == null
+					? "Unavailable" : tick.activePrayers.isEmpty() ? "None" : escape(prettyList(tick.activePrayers)));
 				html.append("<h3>Equipment</h3>").append(items(tick.equipment));
 				html.append("<h3>Inventory</h3>").append(items(tick.inventory));
 			}
@@ -167,14 +169,14 @@ final class ReplayViewerFrame extends JFrame
 
 	static List<String> descriptions(RecordedTick tick, String selectedKey, RecordedTick previous)
 	{
-		List<String> result = new ArrayList<>(); Map<String, String> names = new HashMap<>(); for (ActorSnapshot actor : tick.actors) names.put(actor.key, actor.label);
+		List<String> result = new ArrayList<>(); Map<String, String> names = new HashMap<>(); for (ActorSnapshot actor : tick.actors) names.put(actor.key, actor.displayName());
 		if (previous != null)
 		{
 			ActorSnapshot selected = actor(tick, selectedKey);
 			ActorSnapshot oldSelected = actor(previous, selectedKey);
 			if (selected != null && oldSelected != null && "PLAYER".equals(selected.kind))
 			{
-				if ("You".equals(selected.label))
+				if (selected.isLocalPlayer)
 				{
 					List<String> equipment = itemChanges(previous.equipment, tick.equipment);
 					if (!equipment.isEmpty()) result.add(equipment.size() + "-slot gear switch: " + String.join(", ", equipment));
@@ -199,7 +201,11 @@ final class ReplayViewerFrame extends JFrame
 			switch (event.type)
 			{
 				case "HITSPLAT":
-					if (event.id == HitsplatID.HEAL)
+					if (event.value == null)
+					{
+						result.add(actor + " received a hitsplat (amount unavailable)");
+					}
+					else if (Integer.valueOf(HitsplatID.HEAL).equals(event.id))
 					{
 						result.add(actor + " healed " + event.value + " (observed; method unknown)");
 					}
@@ -210,14 +216,17 @@ final class ReplayViewerFrame extends JFrame
 							+ (source == null ? " (source unknown)" : " from " + source));
 					}
 					break;
-				case "RESOURCE_CHANGE": result.add(event.detail + " " + signed(event.value)); break;
-				case "ITEM_ACTION": result.add("Attempted " + event.detail + " [item " + event.id + "]"); break;
-				case "PRAYER_CHANGE": result.add(pretty(event.detail) + (event.value == 1 ? " activated" : " deactivated")); break;
+				case "RESOURCE_CHANGE": if (event.value != null) result.add(event.detail + " " + signed(event.value)); break;
+				case "ITEM_ACTION": result.add("Attempted " + event.detail
+					+ (event.id == null ? " [item unavailable]" : " [item " + event.id + "]")); break;
+				case "PRAYER_CHANGE": if (event.value != null) result.add(pretty(event.detail) + (event.value == 1 ? " activated" : " deactivated")); break;
 				case "DEATH": result.add(actor + " died"); break;
-				case "PROJECTILE": result.add(actor + " launched projectile " + event.id
+				case "PROJECTILE": result.add(actor + " launched projectile "
+					+ (event.id == null ? "(definition unavailable)" : event.id)
 					+ (event.targetKey == null ? " (target unknown)" : " at " + names.getOrDefault(event.targetKey, "Actor"))
 					+ " (observed)"); break;
-				case "ANIMATION": result.add("Animation " + event.id + " observed"); break;
+				case "ANIMATION": result.add(event.id == null
+					? "Animation observed (definition unavailable)" : "Animation " + event.id + " observed"); break;
 				case "MECHANIC": result.add(event.detail + " (inferred)"); break;
 				default: break;
 			}
@@ -258,9 +267,10 @@ final class ReplayViewerFrame extends JFrame
 	}
 
 	private static Map<Integer, ItemSnapshot> slots(List<ItemSnapshot> items) { Map<Integer, ItemSnapshot> result = new HashMap<>(); if (items != null) for (ItemSnapshot item : items) result.put(item.slot, item); return result; }
-	private static String items(List<ItemSnapshot> items) { if (items == null || items.isEmpty()) return "Empty"; StringBuilder value = new StringBuilder(); for (ItemSnapshot item : items) value.append(escape(item.displayName())).append(item.quantity > 1 ? " ×" + item.quantity : "").append("<br>"); return value.toString(); }
+	private static String items(List<ItemSnapshot> items) { if (items == null) return "Unavailable"; if (items.isEmpty()) return "Empty"; StringBuilder value = new StringBuilder(); for (ItemSnapshot item : items) value.append(escape(item.displayName())).append(item.quantity > 1 ? " ×" + item.quantity : "").append("<br>"); return value.toString(); }
 	private static ActorSnapshot actor(RecordedTick tick, String key) { if (tick != null && key != null) for (ActorSnapshot actor : tick.actors) if (key.equals(actor.key)) return actor; return null; }
-	private static String localKey(RecordedTick tick) { if (tick != null) for (ActorSnapshot actor : tick.actors) if ("You".equals(actor.label)) return actor.key; return null; }
+	private static String localKey(RecordedTick tick) { if (tick != null) for (ActorSnapshot actor : tick.actors) if (actor.isLocalPlayer) return actor.key; return null; }
+	private static String resource(int current, int maximum) { return current < 0 || maximum < 0 ? "Unavailable" : current + " / " + maximum; }
 	private static String signed(int value) { return value > 0 ? "+" + value : Integer.toString(value); }
 	private static String pretty(String value) { return value == null ? "" : value.toLowerCase().replace('_', ' '); }
 	private static String prettyList(List<String> values) { List<String> result = new ArrayList<>(); for (String value : values) result.add(pretty(value)); return String.join(", ", result); }

@@ -8,7 +8,7 @@ On each game tick the plugin records all visible players and NPCs in the top-lev
 
 The local player's complete inventory and equipment are captured by slot every tick and whenever either container changes, preserving intra-tick gear switches. Item actions such as Eat, Drink, Wear, and Wield are recorded with the item ID and inventory slot. Current/base Hitpoints and Prayer are captured every tick, with each increase or decrease represented as a resource-change event. Together these observations allow consumable actions to be correlated with the resulting HP or Prayer gain without relying on a static food or potion list.
 
-Player names are never written to recordings. Other players receive recording-local aliases.
+Format v1 writes the exact display names of every visible player into each private recording, including players who do not use Combat Replay. Names are sensitive replay content: recordings should be shared only with people you trust. When web upload is enabled, the private upload will contain these names; they are not used for public profiles, global search, analytics, or dashboard summaries.
 
 ## Using it
 
@@ -19,13 +19,13 @@ Player names are never written to recordings. Other players receive recording-lo
 5. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
 6. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
 
-The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as JSON under RuneLite's `combat-replay` directory. The current format stores compact per-tick deltas, a recording-level item-name dictionary, and packed scene observations; replays are reconstructed into complete tick states when opened.
+The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
 
 ## Limits
 
 This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source; melee attribution therefore requires later encounter-specific interpretation. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
 
-A future group-content phase should support merging cooperative recordings from multiple consenting clients. That would provide each participant's local inventory, resources, prayers, and item actions while retaining recording-local pseudonyms.
+A future group-content phase may support merging cooperative recordings from multiple consenting clients. Format v1 captures synchronization evidence for that future work, but does not claim a globally authoritative server tick.
 
 ## Development
 

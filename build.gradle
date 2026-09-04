@@ -17,6 +17,8 @@ def pluginMainClass = 'com.combatreplay.CombatReplayPluginTest'
 dependencies {
 	compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
 	testImplementation 'junit:junit:4.13.2'
+	testImplementation 'com.networknt:json-schema-validator:1.5.9'
+	testImplementation 'org.mockito:mockito-core:5.23.0'
 	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
 	testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
 }

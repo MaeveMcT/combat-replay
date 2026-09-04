@@ -77,7 +77,7 @@ final class EventTimeline extends JSlider
 		{
 			for (ActorSnapshot actor : tick.actors)
 			{
-				if (!"PLAYER".equals(actor.kind) || "You".equals(actor.label)) continue;
+				if (!"PLAYER".equals(actor.kind) || actor.isLocalPlayer) continue;
 				ActorSnapshot old = actor(previous, actor.key);
 				if (old != null && !java.util.Objects.equals(old.overheadIcon, actor.overheadIcon))
 					return new Color(80, 180, 255);
@@ -96,7 +96,8 @@ final class EventTimeline extends JSlider
 
 	private static boolean sameItems(java.util.List<ItemSnapshot> left, java.util.List<ItemSnapshot> right)
 	{
-		if (left.size() != right.size()) return false;
+		if (left == right) return true;
+		if (left == null || right == null || left.size() != right.size()) return false;
 		for (int index = 0; index < left.size(); index++)
 		{
 			ItemSnapshot a = left.get(index), b = right.get(index);

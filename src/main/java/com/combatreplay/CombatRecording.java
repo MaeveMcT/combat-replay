@@ -8,14 +8,19 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 final class CombatRecording
 {
-	static final int FORMAT_VERSION = 6;
+	static final int FORMAT_VERSION = 1;
 	private static final DateTimeFormatter NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 		.withZone(ZoneId.systemDefault());
 
 	final int formatVersion;
+	final String recordingId;
+	final String pluginVersion;
+	final String runeLiteVersion;
+	final Integer gameRevision;
 	final long startedAtEpochMillis;
 	final long endedAtEpochMillis;
 	final String name;
@@ -23,13 +28,25 @@ final class CombatRecording
 
 	CombatRecording(long startedAtEpochMillis)
 	{
-		this(FORMAT_VERSION, startedAtEpochMillis, 0L, null, new ArrayList<>());
+		this(startedAtEpochMillis, "development", "unknown", null);
 	}
 
-	private CombatRecording(int formatVersion, long startedAtEpochMillis, long endedAtEpochMillis,
-		String name, List<RecordedTick> ticks)
+	CombatRecording(long startedAtEpochMillis, String pluginVersion, String runeLiteVersion,
+		Integer gameRevision)
+	{
+		this(FORMAT_VERSION, UUID.randomUUID().toString(), pluginVersion, runeLiteVersion,
+			gameRevision, startedAtEpochMillis, 0L, null, new ArrayList<>());
+	}
+
+	private CombatRecording(int formatVersion, String recordingId, String pluginVersion,
+		String runeLiteVersion, Integer gameRevision, long startedAtEpochMillis,
+		long endedAtEpochMillis, String name, List<RecordedTick> ticks)
 	{
 		this.formatVersion = formatVersion;
+		this.recordingId = recordingId;
+		this.pluginVersion = pluginVersion;
+		this.runeLiteVersion = runeLiteVersion;
+		this.gameRevision = gameRevision;
 		this.startedAtEpochMillis = startedAtEpochMillis;
 		this.endedAtEpochMillis = endedAtEpochMillis;
 		this.name = name;
@@ -53,13 +70,15 @@ final class CombatRecording
 
 	CombatRecording snapshot()
 	{
-		return new CombatRecording(formatVersion, startedAtEpochMillis, endedAtEpochMillis, name,
+		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
+			gameRevision, startedAtEpochMillis, endedAtEpochMillis, name,
 			Collections.unmodifiableList(new ArrayList<>(ticks)));
 	}
 
 	CombatRecording completed(long endedAt)
 	{
-		return new CombatRecording(formatVersion, startedAtEpochMillis, endedAt, generatedName(),
+		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
+			gameRevision, startedAtEpochMillis, endedAt, generatedName(),
 			Collections.unmodifiableList(new ArrayList<>(ticks)));
 	}
 
@@ -73,7 +92,7 @@ final class CombatRecording
 			for (ActorSnapshot actor : tick.actors)
 			{
 				labels.put(actor.key, actor.label);
-				if ("NPC".equals(actor.kind) && actor.targetKey != null)
+				if ("NPC".equals(actor.kind) && actor.label != null && actor.targetKey != null)
 				{
 					npcTicks.merge(actor.label, 1, Integer::sum);
 				}
@@ -99,15 +118,24 @@ final class CombatRecording
 			+ " — " + NAME_TIME.format(Instant.ofEpochMilli(startedAtEpochMillis));
 	}
 
+	static CombatRecording restored(String recordingId, String pluginVersion, String runeLiteVersion,
+		Integer gameRevision, long startedAt, long endedAt, String name, List<RecordedTick> ticks)
+	{
+		return new CombatRecording(FORMAT_VERSION, recordingId, pluginVersion, runeLiteVersion,
+			gameRevision, startedAt, endedAt, name,
+			Collections.unmodifiableList(new ArrayList<>(ticks)));
+	}
+
 	static CombatRecording restored(long startedAt, long endedAt, String name, List<RecordedTick> ticks)
 	{
-		return new CombatRecording(FORMAT_VERSION, startedAt, endedAt, name,
-			Collections.unmodifiableList(new ArrayList<>(ticks)));
+		return restored(UUID.randomUUID().toString(), "development", "unknown", null,
+			startedAt, endedAt, name, ticks);
 	}
 
 	CombatRecording renamed(String newName)
 	{
-		return new CombatRecording(formatVersion, startedAtEpochMillis, endedAtEpochMillis,
-			newName, Collections.unmodifiableList(new ArrayList<>(ticks)));
+		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
+			gameRevision, startedAtEpochMillis, endedAtEpochMillis, newName,
+			Collections.unmodifiableList(new ArrayList<>(ticks)));
 	}
 }

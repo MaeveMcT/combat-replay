@@ -115,7 +115,9 @@ final class ReplayMapPanel extends JPanel
 		if (recording == null) return;
 		for (int i = 0; i <= tickIndex && i < recording.ticks.size(); i++)
 		{
-			List<SceneTileSnapshot> tiles = recording.ticks.get(i).sceneTiles;
+			RecordedTick tick = recording.ticks.get(i);
+			for (SceneTileKey removed : tick.sceneRemovals) observedTiles.remove(removed.mapKey());
+			List<SceneTileSnapshot> tiles = tick.sceneTiles;
 			if (tiles != null) for (SceneTileSnapshot tile : tiles) observedTiles.put(tile.mapKey(), tile);
 		}
 	}
@@ -246,9 +248,10 @@ final class ReplayMapPanel extends JPanel
 			if (selected) { g.setColor(new Color(255, 205, 55)); g.fillOval(x - diameter / 2 - 4, y - diameter / 2 - 4, diameter + 8, diameter + 8); }
 			g.setColor(actor.dead ? Color.DARK_GRAY : "PLAYER".equals(actor.kind) ? new Color(65, 155, 245) : new Color(225, 75, 70));
 			g.fillOval(x - diameter / 2, y - diameter / 2, diameter, diameter); g.setColor(new Color(15, 15, 15)); g.drawOval(x - diameter / 2, y - diameter / 2, diameter, diameter);
-			g.setColor(Color.WHITE); FontMetrics fm = g.getFontMetrics(); g.drawString(actor.label, x - fm.stringWidth(actor.label) / 2, y + diameter / 2 + fm.getAscent() + 2);
+			String displayName = actor.displayName();
+			g.setColor(Color.WHITE); FontMetrics fm = g.getFontMetrics(); g.drawString(displayName, x - fm.stringWidth(displayName) / 2, y + diameter / 2 + fm.getAscent() + 2);
 			String prayerBadge = actor.overheadIcon == null ? null : prayerBadge(actor.overheadIcon);
-			if (prayerBadge == null && "You".equals(actor.label)
+			if (prayerBadge == null && actor.isLocalPlayer
 				&& tick.activePrayers != null && !tick.activePrayers.isEmpty()) prayerBadge = "P";
 			if (prayerBadge != null)
 			{
@@ -270,12 +273,12 @@ final class ReplayMapPanel extends JPanel
 				if (!"PLAYER".equals(player.kind)) continue;
 				ActorSnapshot old = actor(previous, player.key);
 				if (old == null) continue;
-				int switched = "You".equals(player.label)
+				int switched = player.isLocalPlayer
 					? changedSlots(previous.equipment, tick.equipment)
 					: changedSlots(old.visibleEquipment, player.visibleEquipment);
 				if (switched > 0)
 				{
-					drawTag(g, player, ("You".equals(player.label) ? "" : "visible ")
+					drawTag(g, player, (player.isLocalPlayer ? "" : "visible ")
 						+ switched + "-slot gear switch", new Color(255, 205, 65), rows, tick);
 				}
 				if (!java.util.Objects.equals(old.overheadIcon, player.overheadIcon))
@@ -313,11 +316,12 @@ final class ReplayMapPanel extends JPanel
 			String text = null; Color color = Color.WHITE;
 			if ("HITSPLAT".equals(event.type))
 			{
-				if (event.id == HitsplatID.HEAL) { text = "+" + event.value + " HP"; color = new Color(80, 230, 105); }
+				if (event.value == null) { text = "Hit (amount unavailable)"; color = Color.LIGHT_GRAY; }
+				else if (Integer.valueOf(HitsplatID.HEAL).equals(event.id)) { text = "+" + event.value + " HP"; color = new Color(80, 230, 105); }
 				else { text = event.value == 0 ? "0" : "-" + event.value; color = event.value == 0 ? Color.LIGHT_GRAY : new Color(255, 85, 85); }
 			}
-			else if ("RESOURCE_CHANGE".equals(event.type) && event.value > 0) { text = "+" + event.value + ("PRAYER".equals(event.detail) ? " Prayer" : " HP"); color = "PRAYER".equals(event.detail) ? new Color(85, 170, 255) : new Color(80, 230, 105); }
-			else if ("PRAYER_CHANGE".equals(event.type)) { text = pretty(event.detail) + (event.value == 1 ? " on" : " off"); color = new Color(100, 190, 255); }
+			else if ("RESOURCE_CHANGE".equals(event.type) && event.value != null && event.value > 0) { text = "+" + event.value + ("PRAYER".equals(event.detail) ? " Prayer" : " HP"); color = "PRAYER".equals(event.detail) ? new Color(85, 170, 255) : new Color(80, 230, 105); }
+			else if ("PRAYER_CHANGE".equals(event.type) && event.value != null) { text = pretty(event.detail) + (event.value == 1 ? " on" : " off"); color = new Color(100, 190, 255); }
 			else if ("ITEM_ACTION".equals(event.type)) { text = event.detail; color = new Color(255, 180, 55); }
 			if (text != null) drawTag(g, actor, text, color, rows, tick);
 		}
@@ -351,7 +355,7 @@ final class ReplayMapPanel extends JPanel
 		for (ActorSnapshot actor : tick.actors)
 		{
 			boolean nearby = local == null || (actor.worldViewId == local.worldViewId && Math.abs(actor.sceneX - local.sceneX) <= 24 && Math.abs(actor.sceneY - local.sceneY) <= 24);
-			boolean focused = "You".equals(actor.label) || actor.targetKey != null || isTarget(tick, actor.key) || hasCombatEvent(tick, actor.key);
+			boolean focused = actor.isLocalPlayer || actor.targetKey != null || isTarget(tick, actor.key) || hasCombatEvent(tick, actor.key);
 			if (nearby && (actorFilter == ActorFilter.NEARBY || focused || actor.key.equals(selectedKey))) result.add(actor);
 		}
 		return result;
@@ -373,7 +377,7 @@ final class ReplayMapPanel extends JPanel
 	private RecordedTick currentTick() { return recording.ticks.get(tickIndex); }
 	private static ActorSnapshot actor(RecordedTick tick, String key) { if (tick != null && key != null) for (ActorSnapshot actor : tick.actors) if (key.equals(actor.key)) return actor; return null; }
 	private static Map<String, ActorSnapshot> byKey(RecordedTick tick) { Map<String, ActorSnapshot> map = new HashMap<>(); for (ActorSnapshot actor : tick.actors) map.put(actor.key, actor); return map; }
-	private static String findLocalKey(RecordedTick tick) { if (tick != null) for (ActorSnapshot actor : tick.actors) if ("You".equals(actor.label)) return actor.key; return null; }
+	private static String findLocalKey(RecordedTick tick) { if (tick != null) for (ActorSnapshot actor : tick.actors) if (actor.isLocalPlayer) return actor.key; return null; }
 	private int worldView(RecordedTick tick) { ActorSnapshot actor = actor(tick, selectedKey); if (actor == null) actor = actor(tick, findLocalKey(tick)); return actor == null ? 0 : actor.worldViewId; }
 	private int plane(RecordedTick tick) { ActorSnapshot actor = actor(tick, selectedKey); if (actor == null) actor = actor(tick, findLocalKey(tick)); return actor == null ? 0 : actor.plane; }
 	private double mapX(RecordedTick tick, ActorSnapshot actor) { return ActorMapPosition.axis(recording.formatVersion, tick.baseX, actor.sceneX, actor.size, actor.localX); }

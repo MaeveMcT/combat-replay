@@ -1,0 +1,221 @@
+package com.combatreplay;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.InputStream;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Consumer;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+public class ReplayV1FormatTest
+{
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    @Test
+    public void writesVersionOneEnvelopeWithStableRecordingIdentity() throws Exception
+    {
+        CombatRecording completed = completedRecording();
+        RecordingStore store = new RecordingStore(new Gson(), temporary.newFolder().toPath());
+
+        Path path = store.save(completed);
+        JsonObject json;
+        try (Reader reader = Files.newBufferedReader(path))
+        {
+            json = new JsonParser().parse(reader).getAsJsonObject();
+        }
+
+        assertEquals(1, json.get("format_version").getAsInt());
+        assertEquals(completed.recordingId, json.get("recording_id").getAsString());
+        assertNotNull(UUID.fromString(completed.recordingId));
+        assertTrue(json.has("producer"));
+        assertTrue(json.has("capture"));
+        assertTrue(json.has("dictionaries"));
+        assertTrue(json.getAsJsonArray("ticks").get(0).getAsJsonObject().get("keyframe").getAsBoolean());
+    }
+
+    @Test
+    public void preservesExactPlayerNamesAndMarksLocalPlayerExplicitly()
+    {
+        ActorSnapshot local = player("player-1", "Alice", true);
+        ActorSnapshot teammate = player("player-2", "Bob", false);
+        CombatRecording recording = new CombatRecording(1_000L);
+        recording.add(new RecordedTick(0, 100, 3200, 3200, false,
+            90, 99, 70, 70, java.util.Arrays.asList(local, teammate), Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+
+        JsonArray actors = ReplayV1Format.encode(recording.completed(1_600L))
+            .getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonObject("actors").getAsJsonArray("upsert");
+
+        assertEquals("Alice", actors.get(0).getAsJsonObject().get("display_name").getAsString());
+        assertTrue(actors.get(0).getAsJsonObject().get("is_local_player").getAsBoolean());
+        assertEquals("Bob", actors.get(1).getAsJsonObject().get("display_name").getAsString());
+        assertTrue(!actors.get(1).getAsJsonObject().get("is_local_player").getAsBoolean());
+    }
+
+    @Test
+    public void reconstructsNullClearsRemovalsReappearanceAndInstanceTransition() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/deltas-and-instance.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+
+        CombatRecording recording = ReplayV1Format.decode(fixture);
+
+        assertEquals(3, recording.ticks.size());
+        assertEquals("Alice", recording.ticks.get(0).actors.get(0).label);
+        assertEquals(1, recording.ticks.get(1).actors.size());
+        assertEquals(-1, recording.ticks.get(1).prayer);
+        assertEquals(null, recording.ticks.get(1).actors.get(0).targetKey);
+        assertEquals(null, recording.ticks.get(1).actors.get(0).visibleEquipment);
+        assertEquals("observed", recording.ticks.get(0).events.get(0).evidence);
+        assertEquals("view-main", recording.ticks.get(0).events.get(0).viewKey);
+        assertEquals("view-instance", recording.ticks.get(1).viewKey);
+        assertEquals("view-instance", recording.ticks.get(1).actors.get(0).viewKey);
+        assertEquals(12345, recording.ticks.get(1).instanceTemplateChunks[0][0][0]);
+        assertEquals(1, recording.ticks.get(1).inventory.size());
+        assertEquals(1, recording.ticks.get(1).sceneRemovals.size());
+        assertTrue(recording.ticks.get(1).sceneTiles.isEmpty());
+        assertEquals("Bob", recording.ticks.get(2).actors.get(1).label);
+        assertTrue(!recording.ticks.get(2).actors.get(1).isLocalPlayer);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsPartialFirstActorAppearance() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/deltas-and-instance.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+        fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonObject("actors").getAsJsonArray("upsert").get(0).getAsJsonObject()
+            .remove("kind");
+
+        ReplayV1Format.decode(fixture);
+    }
+
+    @Test
+    public void rejectsSemanticInvariantViolations() throws Exception
+    {
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonObject("actors").getAsJsonArray("upsert").add(
+                fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                    .getAsJsonObject("actors").getAsJsonArray("upsert").get(0).deepCopy()));
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonObject("scene").getAsJsonArray("remove").add(
+                fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                    .getAsJsonObject("scene").getAsJsonArray("upsert").get(0).deepCopy()));
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").add(fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                .getAsJsonArray("events").get(0).deepCopy()));
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").get(0).getAsJsonObject()
+                .getAsJsonArray("evidence_event_ids").add("missing-event"));
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonObject("sync").addProperty("elapsed_millis", 700));
+        assertRejected(fixture -> fixture.getAsJsonObject("capture")
+            .addProperty("local_actor_key", "player-2"));
+        assertRejected(fixture -> fixture.getAsJsonObject("capture")
+            .getAsJsonArray("capabilities").remove(2));
+        assertRejected(fixture -> fixture.getAsJsonArray("ticks").get(1).getAsJsonObject()
+            .getAsJsonObject("context").addProperty("instanced", false));
+    }
+
+    @Test
+    public void preservesUnavailableAndZeroEventNumbers() throws Exception
+    {
+        JsonObject fixture = fixture();
+        JsonObject event = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").get(0).getAsJsonObject();
+        event.add("definition_id", com.google.gson.JsonNull.INSTANCE);
+        event.addProperty("amount", 0);
+
+        RecordedEvent decoded = ReplayV1Format.decode(fixture).ticks.get(0).events.get(0);
+
+        assertNull(decoded.id);
+        assertEquals(Integer.valueOf(0), decoded.value);
+    }
+
+    @Test
+    public void emittedRecordingMatchesCanonicalSchema() throws Exception
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+        try (InputStream schemaStream = getClass().getResourceAsStream("/replay-v1/replay-v1.schema.json"))
+        {
+            JsonSchema schema = factory.getSchema(schemaStream);
+            Set<ValidationMessage> emittedErrors = schema.validate(
+                mapper.readTree(ReplayV1Format.encode(completedRecording()).toString()));
+            assertTrue(emittedErrors.toString(), emittedErrors.isEmpty());
+            Set<ValidationMessage> fixtureErrors = schema.validate(mapper.readTree(
+                getClass().getResourceAsStream("/replay-v1/valid/deltas-and-instance.json")));
+            assertTrue(fixtureErrors.toString(), fixtureErrors.isEmpty());
+        }
+    }
+
+    private void assertRejected(Consumer<JsonObject> mutation) throws Exception
+    {
+        JsonObject fixture = fixture();
+        mutation.accept(fixture);
+        try
+        {
+            ReplayV1Format.decode(fixture);
+            fail("Expected semantic validation to reject fixture");
+        }
+        catch (IllegalArgumentException expected)
+        {
+            // Expected.
+        }
+    }
+
+    private JsonObject fixture() throws Exception
+    {
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/deltas-and-instance.json")))
+        {
+            return new JsonParser().parse(reader).getAsJsonObject();
+        }
+    }
+
+    private static ActorSnapshot player(String key, String name, boolean local)
+    {
+        return new ActorSnapshot(key, "PLAYER", name, local, -1,
+            3200, 3200, 10, 10, 1280, 1280, 0, 0, 1, 0,
+            -1, -1, -1, -1, null, false, Collections.emptyList(), null);
+    }
+
+    private static CombatRecording completedRecording()
+    {
+        CombatRecording recording = new CombatRecording(1_000L);
+        recording.add(new RecordedTick(0, 100, 3200, 3200, false,
+            90, 99, 70, 70, Collections.singletonList(player("player-1", "Alice", true)), Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        return recording.completed(1_600L);
+    }
+}

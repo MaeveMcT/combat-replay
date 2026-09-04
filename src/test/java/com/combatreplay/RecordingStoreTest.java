@@ -22,7 +22,7 @@ public class RecordingStoreTest
 	public TemporaryFolder temporary = new TemporaryFolder();
 
 	@Test
-	public void compactDeltasRoundTripToCompleteTicks() throws Exception
+	public void versionOneRecordingRoundTripsToCompleteTicks() throws Exception
 	{
 		Path directory = temporary.newFolder("recordings").toPath();
 		RecordingStore store = new RecordingStore(new Gson(), directory);
@@ -31,6 +31,7 @@ public class RecordingStoreTest
 		Path path = store.save(source);
 		CombatRecording loaded = store.load(path);
 
+		assertEquals(source.recordingId, loaded.recordingId);
 		assertEquals(2, loaded.ticks.size());
 		assertEquals("You", loaded.ticks.get(1).actors.get(0).label);
 		assertEquals(1344, loaded.ticks.get(1).actors.get(0).localX);
@@ -44,16 +45,13 @@ public class RecordingStoreTest
 		try (Reader reader = Files.newBufferedReader(path))
 		{
 			JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
-			JsonArray ticks = root.getAsJsonArray("t");
-			JsonObject second = ticks.get(1).getAsJsonObject();
-			assertFalse("unchanged inventory should be omitted", second.has("i"));
-			assertFalse("unchanged equipment should be omitted", second.has("q"));
-			assertFalse("unchanged actor label should be omitted",
-				second.getAsJsonArray("a").get(0).getAsJsonObject().has("l"));
-			assertFalse("unchanged visible equipment should be omitted",
-				second.getAsJsonArray("a").get(0).getAsJsonObject().has("q"));
-			assertTrue("scene tiles should use a packed array",
-				ticks.get(0).getAsJsonObject().get("s").isJsonArray());
+			assertEquals(1, root.get("format_version").getAsInt());
+			assertTrue(root.has("recording_id"));
+			assertFalse("legacy compact envelope must not be emitted", root.has("v"));
+			JsonArray ticks = root.getAsJsonArray("ticks");
+			assertTrue(ticks.get(0).getAsJsonObject().get("keyframe").getAsBoolean());
+			assertTrue(ticks.get(0).getAsJsonObject().has("actors"));
+			assertTrue(ticks.get(0).getAsJsonObject().has("scene"));
 		}
 	}
 

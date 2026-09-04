@@ -4,6 +4,7 @@ package com.combatreplay;
 final class SceneTileSnapshot
 {
 	final int worldViewId;
+	final String viewKey;
 	final int plane;
 	final int x;
 	final int y;
@@ -18,7 +19,16 @@ final class SceneTileSnapshot
 	SceneTileSnapshot(int worldViewId, int plane, int x, int y, int height, int terrainColor,
 		int collisionFlags, int wallId, int groundObjectId, int decorativeObjectId, int[] gameObjectIds)
 	{
+		this(worldViewId, "view-" + worldViewId, plane, x, y, height, terrainColor,
+			collisionFlags, wallId, groundObjectId, decorativeObjectId, gameObjectIds);
+	}
+
+	SceneTileSnapshot(int worldViewId, String viewKey, int plane, int x, int y, int height,
+		int terrainColor, int collisionFlags, int wallId, int groundObjectId,
+		int decorativeObjectId, int[] gameObjectIds)
+	{
 		this.worldViewId = worldViewId;
+		this.viewKey = viewKey;
 		this.plane = plane;
 		this.x = x;
 		this.y = y;
@@ -33,7 +43,7 @@ final class SceneTileSnapshot
 
 	String mapKey()
 	{
-		return worldViewId + ":" + plane + ":" + x + ":" + y;
+		return viewKey + ":" + plane + ":" + x + ":" + y;
 	}
 
 	String contentKey()

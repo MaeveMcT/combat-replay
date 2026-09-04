@@ -31,6 +31,9 @@ import net.runelite.client.ui.components.shadowlabel.JShadowedLabel;
 @Singleton
 final class CombatReplayPanel extends PluginPanel
 {
+	static final String PRIVACY_DISCLOSURE = "Recordings contain the exact names of all visible players "
+		+ "and may later be uploaded privately. Replays contain client observations, not authoritative server state.";
+
 	private final RecordingStore store;
 	private final JLabel status = new JShadowedLabel("Ready to record");
 	private final JLabel liveStats = new JShadowedLabel(" ");
@@ -122,7 +125,7 @@ final class CombatReplayPanel extends PluginPanel
 	private JPanel noteCard()
 	{
 		JPanel panel = card(); panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); panel.add(caption("PRIVACY & EVIDENCE")); panel.add(Box.createVerticalStrut(4));
-		JLabel text = new JLabel("<html><div style='width:190px'>Player names are replaced with stable recording-local aliases. Replays contain client observations, not authoritative server state.</div></html>"); text.setFont(FontManager.getRunescapeSmallFont()); text.setForeground(ColorScheme.LIGHT_GRAY_COLOR); panel.add(text); return panel;
+		JLabel text = new JLabel("<html><div style='width:190px'>" + PRIVACY_DISCLOSURE + "</div></html>"); text.setFont(FontManager.getRunescapeSmallFont()); text.setForeground(ColorScheme.LIGHT_GRAY_COLOR); panel.add(text); return panel;
 	}
 
 	private void refreshLibrary()

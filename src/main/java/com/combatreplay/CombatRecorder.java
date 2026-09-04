@@ -28,22 +28,22 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.kit.KitType;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.client.RuneLiteProperties;
 
 @Singleton
 final class CombatRecorder
 {
 	private final Client client;
 	private final Map<Actor, String> actorKeys = new IdentityHashMap<>();
-	private final Map<Player, String> playerLabels = new IdentityHashMap<>();
 	private final List<RecordedEvent> pendingEvents = new ArrayList<>();
 	private final List<ContainerSnapshot> pendingContainerChanges = new ArrayList<>();
 	private final Map<String, String> recordedTiles = new HashMap<>();
 	private final Set<String> previousPrayers = new HashSet<>();
 	private CombatRecording recording;
 	private int nextActorId;
-	private int nextPlayerLabel;
 	private int previousHitpoints = -1;
 	private int previousPrayer = -1;
+	private long recordingStartedNanos;
 
 	@Inject
 	CombatRecorder(Client client)
@@ -53,15 +53,19 @@ final class CombatRecorder
 
 	void start()
 	{
-		recording = new CombatRecording(System.currentTimeMillis());
+		Package pluginPackage = CombatReplayPlugin.class.getPackage();
+		String pluginVersion = pluginPackage == null ? null : pluginPackage.getImplementationVersion();
+		recording = new CombatRecording(System.currentTimeMillis(),
+			pluginVersion == null ? "development" : pluginVersion,
+			RuneLiteProperties.getVersion() == null ? "unknown" : RuneLiteProperties.getVersion(),
+			client.getRevision());
+		recordingStartedNanos = System.nanoTime();
 		actorKeys.clear();
-		playerLabels.clear();
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
 		recordedTiles.clear();
 		previousPrayers.clear();
 		nextActorId = 1;
-		nextPlayerLabel = 1;
 		previousHitpoints = -1;
 		previousPrayer = -1;
 	}
@@ -156,8 +160,15 @@ final class CombatRecorder
 		previousPrayer = prayer;
 		List<String> activePrayers = capturePrayers();
 
+		long observedAt = System.currentTimeMillis();
+		long elapsedMillis = Math.max(0L, (System.nanoTime() - recordingStartedNanos) / 1_000_000L);
+		int world = client.getWorld();
+		int viewIdentity = viewIdentity(worldView);
 		recording.add(new RecordedTick(recording.ticks.size(), client.getGameCycle(),
-			worldView.getBaseX(), worldView.getBaseY(), worldView.isInstance(),
+			client.getTickCount(), observedAt, elapsedMillis, world > 0 ? world : null,
+			"view-" + viewIdentity,
+			worldView.isInstance() ? worldView.getInstanceTemplateChunks() : null,
+			worldView.getPlane(), worldView.getBaseX(), worldView.getBaseY(), worldView.isInstance(),
 			hitpoints, client.getRealSkillLevel(Skill.HITPOINTS),
 			prayer, client.getRealSkillLevel(Skill.PRAYER), actors,
 			snapshotItems(client.getItemContainer(InventoryID.INV)),
@@ -283,7 +294,7 @@ final class CombatRecorder
 		List<ItemSnapshot> snapshots = new ArrayList<>();
 		if (container == null)
 		{
-			return snapshots;
+			return null;
 		}
 		Item[] items = container.getItems();
 		for (int slot = 0; slot < items.length; slot++)
@@ -321,21 +332,16 @@ final class CombatRecorder
 			label = composition != null && composition.getName() != null
 				? composition.getName() : actor.getName();
 		}
-		else if (actor == client.getLocalPlayer())
-		{
-			label = "You";
-		}
 		else
 		{
-			label = playerLabels.computeIfAbsent((Player) actor,
-				ignored -> "Player " + nextPlayerLabel++);
+			label = actor.getName();
 		}
 		int tileSize = composition == null ? 1 : Math.max(1, composition.getSize());
 		List<ItemSnapshot> visibleEquipment = npc ? new ArrayList<>() : snapshotVisibleEquipment((Player) actor);
 		String overheadIcon = npc || ((Player) actor).getOverheadIcon() == null
 			? null : ((Player) actor).getOverheadIcon().name();
-		return new ActorSnapshot(keyFor(actor), npc ? "NPC" : "PLAYER",
-			label == null ? (npc ? "NPC" : "Player") : label, npcId,
+		return new ActorSnapshot(keyFor(actor), npc ? "NPC" : "PLAYER", label,
+			actor == client.getLocalPlayer(), npcId,
 			world.getX(), world.getY(), local.getSceneX(), local.getSceneY(), local.getX(), local.getY(),
 			world.getPlane(), viewIdentity(actor.getWorldView()), tileSize,
 			actor.getCurrentOrientation(), actor.getAnimation(), actor.getPoseAnimation(),
@@ -348,7 +354,7 @@ final class CombatRecorder
 		List<ItemSnapshot> equipment = new ArrayList<>();
 		if (player.getPlayerComposition() == null)
 		{
-			return equipment;
+			return null;
 		}
 		for (KitType slot : KitType.values())
 		{

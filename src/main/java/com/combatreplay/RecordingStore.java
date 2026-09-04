@@ -1,6 +1,8 @@
 package com.combatreplay;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -30,7 +32,7 @@ final class RecordingStore
 
 	RecordingStore(Gson gson, Path directory)
 	{
-		this.gson = gson.newBuilder().create();
+		this.gson = gson.newBuilder().serializeNulls().create();
 		this.directory = directory;
 	}
 
@@ -74,7 +76,8 @@ final class RecordingStore
 	{
 		try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8))
 		{
-			return RecordingFormat.decode(gson.fromJson(reader, RecordingFormat.FileRecording.class));
+			JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
+			return ReplayV1Format.decode(root);
 		}
 	}
 
@@ -102,7 +105,7 @@ final class RecordingStore
 		{
 			try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
 			{
-				gson.toJson(RecordingFormat.encode(recording), writer);
+				gson.toJson(ReplayV1Format.encode(recording), writer);
 			}
 			try
 			{

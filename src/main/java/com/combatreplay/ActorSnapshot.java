@@ -9,6 +9,7 @@ final class ActorSnapshot
 	final String key;
 	final String kind;
 	final String label;
+	final boolean isLocalPlayer;
 	final int npcId;
 	final int worldX;
 	final int worldY;
@@ -18,6 +19,7 @@ final class ActorSnapshot
 	final int localY;
 	final int plane;
 	final int worldViewId;
+	final String viewKey;
 	final int size;
 	final int orientation;
 	final int animation;
@@ -57,9 +59,33 @@ final class ActorSnapshot
 		int healthRatio, int healthScale, String targetKey, boolean dead,
 		List<ItemSnapshot> visibleEquipment, String overheadIcon)
 	{
+		this(key, kind, label, "You".equals(label), npcId, worldX, worldY, sceneX, sceneY,
+			localX, localY, plane, worldViewId, size, orientation, animation, poseAnimation,
+			healthRatio, healthScale, targetKey, dead, visibleEquipment, overheadIcon);
+	}
+
+	ActorSnapshot(String key, String kind, String label, boolean isLocalPlayer, int npcId,
+		int worldX, int worldY, int sceneX, int sceneY, int localX, int localY,
+		int plane, int worldViewId, int size, int orientation, int animation, int poseAnimation,
+		int healthRatio, int healthScale, String targetKey, boolean dead,
+		List<ItemSnapshot> visibleEquipment, String overheadIcon)
+	{
+		this(key, kind, label, isLocalPlayer, npcId, worldX, worldY, sceneX, sceneY,
+			localX, localY, plane, worldViewId, "view-" + worldViewId, size, orientation,
+			animation, poseAnimation, healthRatio, healthScale, targetKey, dead,
+			visibleEquipment, overheadIcon);
+	}
+
+	ActorSnapshot(String key, String kind, String label, boolean isLocalPlayer, int npcId,
+		int worldX, int worldY, int sceneX, int sceneY, int localX, int localY,
+		int plane, int worldViewId, String viewKey, int size, int orientation, int animation,
+		int poseAnimation, int healthRatio, int healthScale, String targetKey, boolean dead,
+		List<ItemSnapshot> visibleEquipment, String overheadIcon)
+	{
 		this.key = key;
 		this.kind = kind;
 		this.label = label;
+		this.isLocalPlayer = isLocalPlayer;
 		this.npcId = npcId;
 		this.worldX = worldX;
 		this.worldY = worldY;
@@ -69,6 +95,7 @@ final class ActorSnapshot
 		this.localY = localY;
 		this.plane = plane;
 		this.worldViewId = worldViewId;
+		this.viewKey = viewKey;
 		this.size = size;
 		this.orientation = orientation;
 		this.animation = animation;
@@ -77,7 +104,13 @@ final class ActorSnapshot
 		this.healthScale = healthScale;
 		this.targetKey = targetKey;
 		this.dead = dead;
-		this.visibleEquipment = Collections.unmodifiableList(new ArrayList<>(visibleEquipment));
+		this.visibleEquipment = visibleEquipment == null ? null
+			: Collections.unmodifiableList(new ArrayList<>(visibleEquipment));
 		this.overheadIcon = overheadIcon;
+	}
+
+	String displayName()
+	{
+		return label == null || label.isEmpty() ? "Unavailable" : label;
 	}
 }
