@@ -23,6 +23,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
+import net.runelite.api.HitsplatID;
 
 final class ReplayViewerFrame extends JFrame
 {
@@ -130,12 +131,22 @@ final class ReplayViewerFrame extends JFrame
 				.append("<br>Animation ").append(selected.animation).append(" &nbsp; Pose ").append(selected.poseAnimation);
 			if (selected.healthScale > 0) html.append("<br>Observed health: ").append(selected.healthRatio).append("/").append(selected.healthScale);
 		}
-		if (selected != null && "You".equals(selected.label))
+		if (selected != null && "PLAYER".equals(selected.kind))
 		{
-			html.append("<h3>Resources</h3>HP ").append(tick.hitpoints).append(" / ").append(tick.maximumHitpoints).append("<br>Prayer ").append(tick.prayer).append(" / ").append(tick.maximumPrayer);
-			html.append("<h3>Active prayers</h3>").append(tick.activePrayers == null || tick.activePrayers.isEmpty() ? "None" : escape(prettyList(tick.activePrayers)));
-			html.append("<h3>Equipment</h3>").append(items(tick.equipment));
-			html.append("<h3>Inventory</h3>").append(items(tick.inventory));
+			if ("You".equals(selected.label))
+			{
+				html.append("<h3>Resources</h3>HP ").append(tick.hitpoints).append(" / ").append(tick.maximumHitpoints).append("<br>Prayer ").append(tick.prayer).append(" / ").append(tick.maximumPrayer);
+				html.append("<h3>Active prayers</h3>").append(tick.activePrayers == null || tick.activePrayers.isEmpty() ? "None" : escape(prettyList(tick.activePrayers)));
+				html.append("<h3>Equipment</h3>").append(items(tick.equipment));
+				html.append("<h3>Inventory</h3>").append(items(tick.inventory));
+			}
+			else
+			{
+				html.append("<h3>Visible protection prayer</h3>")
+					.append(selected.overheadIcon == null ? "None observed" : escape(pretty(selected.overheadIcon)));
+				html.append("<h3>Visible equipment</h3>").append(items(selected.visibleEquipment));
+				html.append("<small>Appearance observations only; inventory, exact resources, and offensive prayers are unavailable.</small>");
+			}
 		}
 		html.append("<h3>Recent events</h3>");
 		int shown = 0;
@@ -154,15 +165,32 @@ final class ReplayViewerFrame extends JFrame
 
 	private RecordedTick previousTick(int index) { return index > 0 ? recording.ticks.get(index - 1) : null; }
 
-	private static List<String> descriptions(RecordedTick tick, String selectedKey, RecordedTick previous)
+	static List<String> descriptions(RecordedTick tick, String selectedKey, RecordedTick previous)
 	{
 		List<String> result = new ArrayList<>(); Map<String, String> names = new HashMap<>(); for (ActorSnapshot actor : tick.actors) names.put(actor.key, actor.label);
 		if (previous != null)
 		{
-			List<String> equipment = itemChanges(previous.equipment, tick.equipment);
-			if (!equipment.isEmpty()) result.add(equipment.size() + "-slot gear switch: " + String.join(", ", equipment));
-			List<String> inventory = inventoryChanges(previous.inventory, tick.inventory);
-			if (!inventory.isEmpty()) result.add("Inventory: " + String.join(", ", inventory));
+			ActorSnapshot selected = actor(tick, selectedKey);
+			ActorSnapshot oldSelected = actor(previous, selectedKey);
+			if (selected != null && oldSelected != null && "PLAYER".equals(selected.kind))
+			{
+				if ("You".equals(selected.label))
+				{
+					List<String> equipment = itemChanges(previous.equipment, tick.equipment);
+					if (!equipment.isEmpty()) result.add(equipment.size() + "-slot gear switch: " + String.join(", ", equipment));
+					List<String> inventory = inventoryChanges(previous.inventory, tick.inventory);
+					if (!inventory.isEmpty()) result.add("Inventory: " + String.join(", ", inventory));
+				}
+				else
+				{
+					List<String> equipment = itemChanges(oldSelected.visibleEquipment, selected.visibleEquipment);
+					if (!equipment.isEmpty()) result.add("Visible " + equipment.size()
+						+ "-slot gear switch (observed): " + String.join(", ", equipment));
+					if (!java.util.Objects.equals(oldSelected.overheadIcon, selected.overheadIcon))
+						result.add("Protection prayer changed (observed): "
+							+ (selected.overheadIcon == null ? "none" : pretty(selected.overheadIcon)));
+				}
+			}
 		}
 		for (RecordedEvent event : tick.events)
 		{
@@ -171,15 +199,24 @@ final class ReplayViewerFrame extends JFrame
 			switch (event.type)
 			{
 				case "HITSPLAT":
-					String source = DamageAttribution.sourceDescription(event.detail);
-					result.add(actor + " took " + event.value + " damage"
-						+ (source == null ? " (source unknown)" : " from " + source));
+					if (event.id == HitsplatID.HEAL)
+					{
+						result.add(actor + " healed " + event.value + " (observed; method unknown)");
+					}
+					else
+					{
+						String source = DamageAttribution.sourceDescription(event.detail);
+						result.add(actor + " took " + event.value + " damage"
+							+ (source == null ? " (source unknown)" : " from " + source));
+					}
 					break;
 				case "RESOURCE_CHANGE": result.add(event.detail + " " + signed(event.value)); break;
 				case "ITEM_ACTION": result.add("Attempted " + event.detail + " [item " + event.id + "]"); break;
 				case "PRAYER_CHANGE": result.add(pretty(event.detail) + (event.value == 1 ? " activated" : " deactivated")); break;
 				case "DEATH": result.add(actor + " died"); break;
-				case "PROJECTILE": result.add("Projectile " + event.id + " observed" + (event.targetKey == null ? " (target unknown)" : "")); break;
+				case "PROJECTILE": result.add(actor + " launched projectile " + event.id
+					+ (event.targetKey == null ? " (target unknown)" : " at " + names.getOrDefault(event.targetKey, "Actor"))
+					+ " (observed)"); break;
 				case "ANIMATION": result.add("Animation " + event.id + " observed"); break;
 				case "MECHANIC": result.add(event.detail + " (inferred)"); break;
 				default: break;

@@ -11,7 +11,7 @@ import java.util.Map;
 
 final class CombatRecording
 {
-	static final int FORMAT_VERSION = 5;
+	static final int FORMAT_VERSION = 6;
 	private static final DateTimeFormatter NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 		.withZone(ZoneId.systemDefault());
 

@@ -26,6 +26,7 @@ import net.runelite.api.TileObject;
 import net.runelite.api.WorldView;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.kit.KitType;
 import net.runelite.api.coords.WorldPoint;
 
 @Singleton
@@ -330,11 +331,34 @@ final class CombatRecorder
 				ignored -> "Player " + nextPlayerLabel++);
 		}
 		int tileSize = composition == null ? 1 : Math.max(1, composition.getSize());
+		List<ItemSnapshot> visibleEquipment = npc ? new ArrayList<>() : snapshotVisibleEquipment((Player) actor);
+		String overheadIcon = npc || ((Player) actor).getOverheadIcon() == null
+			? null : ((Player) actor).getOverheadIcon().name();
 		return new ActorSnapshot(keyFor(actor), npc ? "NPC" : "PLAYER",
 			label == null ? (npc ? "NPC" : "Player") : label, npcId,
 			world.getX(), world.getY(), local.getSceneX(), local.getSceneY(), local.getX(), local.getY(),
 			world.getPlane(), viewIdentity(actor.getWorldView()), tileSize,
 			actor.getCurrentOrientation(), actor.getAnimation(), actor.getPoseAnimation(),
-			actor.getHealthRatio(), actor.getHealthScale(), keyFor(actor.getInteracting()), actor.isDead());
+			actor.getHealthRatio(), actor.getHealthScale(), keyFor(actor.getInteracting()), actor.isDead(),
+			visibleEquipment, overheadIcon);
+	}
+
+	private List<ItemSnapshot> snapshotVisibleEquipment(Player player)
+	{
+		List<ItemSnapshot> equipment = new ArrayList<>();
+		if (player.getPlayerComposition() == null)
+		{
+			return equipment;
+		}
+		for (KitType slot : KitType.values())
+		{
+			int itemId = player.getPlayerComposition().getEquipmentId(slot);
+			if (itemId >= 0)
+			{
+				equipment.add(new ItemSnapshot(slot.getIndex(), itemId, 1,
+					client.getItemDefinition(itemId).getName()));
+			}
+		}
+		return equipment;
 	}
 }

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import javax.swing.JPanel;
 import net.runelite.api.CollisionDataFlag;
+import net.runelite.api.HitsplatID;
 
 final class ReplayMapPanel extends JPanel
 {
@@ -246,9 +247,13 @@ final class ReplayMapPanel extends JPanel
 			g.setColor(actor.dead ? Color.DARK_GRAY : "PLAYER".equals(actor.kind) ? new Color(65, 155, 245) : new Color(225, 75, 70));
 			g.fillOval(x - diameter / 2, y - diameter / 2, diameter, diameter); g.setColor(new Color(15, 15, 15)); g.drawOval(x - diameter / 2, y - diameter / 2, diameter, diameter);
 			g.setColor(Color.WHITE); FontMetrics fm = g.getFontMetrics(); g.drawString(actor.label, x - fm.stringWidth(actor.label) / 2, y + diameter / 2 + fm.getAscent() + 2);
-			if ("You".equals(actor.label) && tick.activePrayers != null && !tick.activePrayers.isEmpty())
+			String prayerBadge = actor.overheadIcon == null ? null : prayerBadge(actor.overheadIcon);
+			if (prayerBadge == null && "You".equals(actor.label)
+				&& tick.activePrayers != null && !tick.activePrayers.isEmpty()) prayerBadge = "P";
+			if (prayerBadge != null)
 			{
-				g.setColor(new Color(85, 175, 255)); g.fillOval(x - 7, y - diameter / 2 - 17, 14, 14); g.setColor(Color.WHITE); g.drawString("P", x - 4, y - diameter / 2 - 5);
+				g.setColor(new Color(85, 175, 255)); g.fillOval(x - 7, y - diameter / 2 - 17, 14, 14);
+				g.setColor(Color.WHITE); g.drawString(prayerBadge, x - 4, y - diameter / 2 - 5);
 			}
 		}
 	}
@@ -288,7 +293,11 @@ final class ReplayMapPanel extends JPanel
 			}
 			if (actor == null) continue;
 			String text = null; Color color = Color.WHITE;
-			if ("HITSPLAT".equals(event.type)) { text = event.value == 0 ? "0" : "-" + event.value; color = event.value == 0 ? Color.LIGHT_GRAY : new Color(255, 85, 85); }
+			if ("HITSPLAT".equals(event.type))
+			{
+				if (event.id == HitsplatID.HEAL) { text = "+" + event.value + " HP"; color = new Color(80, 230, 105); }
+				else { text = event.value == 0 ? "0" : "-" + event.value; color = event.value == 0 ? Color.LIGHT_GRAY : new Color(255, 85, 85); }
+			}
 			else if ("RESOURCE_CHANGE".equals(event.type) && event.value > 0) { text = "+" + event.value + ("PRAYER".equals(event.detail) ? " Prayer" : " HP"); color = "PRAYER".equals(event.detail) ? new Color(85, 170, 255) : new Color(80, 230, 105); }
 			else if ("PRAYER_CHANGE".equals(event.type)) { text = pretty(event.detail) + (event.value == 1 ? " on" : " off"); color = new Color(100, 190, 255); }
 			else if ("ITEM_ACTION".equals(event.type)) { text = event.detail; color = new Color(255, 180, 55); }
@@ -356,6 +365,13 @@ final class ReplayMapPanel extends JPanel
 	private int px(double x) { return (int) Math.round(getWidth() / 2.0 + (x - centerX) * pixelsPerTile); }
 	private int py(double y) { return (int) Math.round(getHeight() / 2.0 - (y - centerY) * pixelsPerTile); }
 	private static String pretty(String value) { return value == null ? "" : value.toLowerCase().replace('_', ' '); }
+	private static String prayerBadge(String icon)
+	{
+		if (icon.contains("MELEE")) return "M";
+		if (icon.contains("RANGE")) return "R";
+		if (icon.contains("MAG")) return "A";
+		return "P";
+	}
 	private static boolean blocksMovement(int flags)
 	{
 		int movement = CollisionDataFlag.BLOCK_MOVEMENT_FULL | CollisionDataFlag.BLOCK_MOVEMENT_OBJECT

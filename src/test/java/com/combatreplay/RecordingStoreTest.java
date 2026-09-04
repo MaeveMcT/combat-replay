@@ -34,6 +34,9 @@ public class RecordingStoreTest
 		assertEquals(2, loaded.ticks.size());
 		assertEquals("You", loaded.ticks.get(1).actors.get(0).label);
 		assertEquals(1344, loaded.ticks.get(1).actors.get(0).localX);
+		assertEquals("Protect from Melee", loaded.ticks.get(1).actors.get(0).overheadIcon);
+		assertEquals(1, loaded.ticks.get(1).actors.get(0).visibleEquipment.size());
+		assertEquals("Abyssal whip", loaded.ticks.get(1).actors.get(0).visibleEquipment.get(0).name);
 		assertEquals("Shark", loaded.ticks.get(1).inventory.get(0).name);
 		assertEquals(4151, loaded.ticks.get(1).equipment.get(0).itemId);
 		assertEquals(1, loaded.ticks.get(0).sceneTiles.size());
@@ -47,6 +50,8 @@ public class RecordingStoreTest
 			assertFalse("unchanged equipment should be omitted", second.has("q"));
 			assertFalse("unchanged actor label should be omitted",
 				second.getAsJsonArray("a").get(0).getAsJsonObject().has("l"));
+			assertFalse("unchanged visible equipment should be omitted",
+				second.getAsJsonArray("a").get(0).getAsJsonObject().has("q"));
 			assertTrue("scene tiles should use a packed array",
 				ticks.get(0).getAsJsonObject().get("s").isJsonArray());
 		}
@@ -77,6 +82,8 @@ public class RecordingStoreTest
 	{
 		return new ActorSnapshot("player-1", "PLAYER", "You", -1,
 			3200, 3200, localX >> 7, 10, localX, 1344, 0, 0, 1,
-			0, -1, -1, -1, -1, null, false);
+			0, -1, -1, -1, -1, null, false,
+			Collections.singletonList(new ItemSnapshot(3, 4151, 1, "Abyssal whip")),
+			"Protect from Melee");
 	}
 }

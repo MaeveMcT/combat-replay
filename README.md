@@ -4,7 +4,7 @@ A RuneLite plugin that records client-observed combat state and replays it in a 
 
 ## Current capture
 
-On each game tick the plugin records all visible players and NPCs in the top-level world view, including position, footprint, orientation, animations, approximate health, interaction target, and death state. It also records hitsplats, projectiles, tile graphics, actor graphics, interaction changes, NPC transformations, actor and scene-object spawns/despawns, deaths, active prayers, and NPC overhead text. Scene terrain, heights, collision, walls, and objects are captured as generic tile observations and retained as the player moves.
+On each game tick the plugin records all visible players and NPCs in the top-level world view, including position, footprint, orientation, animations, approximate health, interaction target, and death state. For visible players it also records appearance-derived equipment and overhead protection-prayer icons, allowing teammate gear switches and prayer changes to be presented as observed actions. It also records hitsplats, projectiles, tile graphics, actor graphics, interaction changes, NPC transformations, actor and scene-object spawns/despawns, deaths, active local-player prayers, and NPC overhead text. Scene terrain, heights, collision, walls, and objects are captured as generic tile observations and retained as the player moves.
 
 The local player's complete inventory and equipment are captured by slot every tick and whenever either container changes, preserving intra-tick gear switches. Item actions such as Eat, Drink, Wear, and Wield are recorded with the item ID and inventory slot. Current/base Hitpoints and Prayer are captured every tick, with each increase or decrease represented as a resource-change event. Together these observations allow consumable actions to be correlated with the resulting HP or Prayer gain without relying on a static food or potion list.
 
@@ -23,7 +23,9 @@ The sidebar recording library can open, rename, delete, and reveal recordings. R
 
 ## Limits
 
-This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source; melee attribution therefore requires later encounter-specific interpretation. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
+This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source; melee attribution therefore requires later encounter-specific interpretation. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
+
+A future group-content phase should support merging cooperative recordings from multiple consenting clients. That would provide each participant's local inventory, resources, prayers, and item actions while retaining recording-local pseudonyms.
 
 ## Development
 

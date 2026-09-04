@@ -1,5 +1,9 @@
 package com.combatreplay;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 final class ActorSnapshot
 {
 	final String key;
@@ -22,6 +26,8 @@ final class ActorSnapshot
 	final int healthScale;
 	final String targetKey;
 	final boolean dead;
+	final List<ItemSnapshot> visibleEquipment;
+	final String overheadIcon;
 
 	ActorSnapshot(String key, String kind, String label, int npcId,
 		int worldX, int worldY, int sceneX, int sceneY, int plane, int worldViewId,
@@ -31,13 +37,25 @@ final class ActorSnapshot
 		this(key, kind, label, npcId, worldX, worldY, sceneX, sceneY,
 			(sceneX << 7) + ((size & 1) == 0 ? 0 : 64),
 			(sceneY << 7) + ((size & 1) == 0 ? 0 : 64), plane, worldViewId, size,
-			orientation, animation, poseAnimation, healthRatio, healthScale, targetKey, dead);
+			orientation, animation, poseAnimation, healthRatio, healthScale, targetKey, dead,
+			Collections.emptyList(), null);
 	}
 
 	ActorSnapshot(String key, String kind, String label, int npcId,
 		int worldX, int worldY, int sceneX, int sceneY, int localX, int localY,
 		int plane, int worldViewId, int size, int orientation, int animation, int poseAnimation,
 		int healthRatio, int healthScale, String targetKey, boolean dead)
+	{
+		this(key, kind, label, npcId, worldX, worldY, sceneX, sceneY, localX, localY,
+			plane, worldViewId, size, orientation, animation, poseAnimation, healthRatio,
+			healthScale, targetKey, dead, Collections.emptyList(), null);
+	}
+
+	ActorSnapshot(String key, String kind, String label, int npcId,
+		int worldX, int worldY, int sceneX, int sceneY, int localX, int localY,
+		int plane, int worldViewId, int size, int orientation, int animation, int poseAnimation,
+		int healthRatio, int healthScale, String targetKey, boolean dead,
+		List<ItemSnapshot> visibleEquipment, String overheadIcon)
 	{
 		this.key = key;
 		this.kind = kind;
@@ -59,5 +77,7 @@ final class ActorSnapshot
 		this.healthScale = healthScale;
 		this.targetKey = targetKey;
 		this.dead = dead;
+		this.visibleEquipment = Collections.unmodifiableList(new ArrayList<>(visibleEquipment));
+		this.overheadIcon = overheadIcon;
 	}
 }

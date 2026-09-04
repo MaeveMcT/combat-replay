@@ -371,6 +371,7 @@ Implement these together as the next cohesive visualization pass:
 - Broad status-effect interpretation
 - Giant Mole mechanic labels beyond the generic foundation
 - Additional encounter interpreters
+- Cooperative multi-client recording merge for complete group telemetry
 
 ## Current known constraints
 

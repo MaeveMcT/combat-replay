@@ -128,7 +128,8 @@ final class RecordingFormat
 		if (file.removedActors != null) for (String key : file.removedActors) actors.remove(key);
 		if (file.actors != null)
 		{
-			for (ActorDelta delta : file.actors) actors.put(delta.key, delta.apply(actors.get(delta.key)));
+			for (ActorDelta delta : file.actors)
+				actors.put(delta.key, delta.apply(actors.get(delta.key), itemNames));
 		}
 		List<ItemSnapshot> inventory = file.inventory == null
 			? previous.inventory : decodeItems(file.inventory, itemNames);
@@ -156,6 +157,7 @@ final class RecordingFormat
 		for (RecordedTick tick : recording.ticks)
 		{
 			addNames(names, tick.inventory); addNames(names, tick.equipment);
+			for (ActorSnapshot actor : tick.actors) addNames(names, actor.visibleEquipment);
 			for (ContainerSnapshot container : tick.containerChanges) addNames(names, container.items);
 		}
 		return names;
@@ -338,6 +340,8 @@ final class RecordingFormat
 		@SerializedName("m") Integer healthScale;
 		@SerializedName("g") String targetKey;
 		@SerializedName("d") Boolean dead;
+		@SerializedName("q") List<FileItem> visibleEquipment;
+		@SerializedName("j") String overheadIcon;
 
 		static ActorDelta between(ActorSnapshot old, ActorSnapshot actor)
 		{
@@ -361,6 +365,10 @@ final class RecordingFormat
 			delta.healthScale = changed(old == null ? null : old.healthScale, actor.healthScale);
 			if (old == null || !Objects.equals(old.targetKey, actor.targetKey)) delta.targetKey = actor.targetKey == null ? "" : actor.targetKey;
 			delta.dead = old == null || old.dead != actor.dead ? actor.dead : null;
+			if (old == null || !sameItems(old.visibleEquipment, actor.visibleEquipment))
+				delta.visibleEquipment = encodeItems(actor.visibleEquipment);
+			if (old == null || !Objects.equals(old.overheadIcon, actor.overheadIcon))
+				delta.overheadIcon = actor.overheadIcon == null ? "" : actor.overheadIcon;
 			return delta;
 		}
 
@@ -370,12 +378,16 @@ final class RecordingFormat
 				|| sceneX != null || sceneY != null || localX != null || localY != null || plane != null
 				|| worldViewId != null || size != null || orientation != null || animation != null
 				|| poseAnimation != null || healthRatio != null || healthScale != null
-				|| targetKey != null || dead != null;
+				|| targetKey != null || dead != null || visibleEquipment != null || overheadIcon != null;
 		}
 
-		ActorSnapshot apply(ActorSnapshot old)
+		ActorSnapshot apply(ActorSnapshot old, Map<Integer, String> itemNames)
 		{
 			String target = targetKey == null ? old == null ? null : old.targetKey : targetKey.isEmpty() ? null : targetKey;
+			List<ItemSnapshot> equipment = visibleEquipment == null
+				? old.visibleEquipment : decodeItems(visibleEquipment, itemNames);
+			String icon = overheadIcon == null ? old == null ? null : old.overheadIcon
+				: overheadIcon.isEmpty() ? null : overheadIcon;
 			return new ActorSnapshot(key, kind == null ? old.kind : kind, label == null ? old.label : label,
 				value(npcId, old == null ? -1 : old.npcId), value(worldX, old == null ? 0 : old.worldX),
 				value(worldY, old == null ? 0 : old.worldY), value(sceneX, old == null ? 0 : old.sceneX),
@@ -385,7 +397,7 @@ final class RecordingFormat
 				value(orientation, old == null ? 0 : old.orientation), value(animation, old == null ? -1 : old.animation),
 				value(poseAnimation, old == null ? -1 : old.poseAnimation), value(healthRatio, old == null ? -1 : old.healthRatio),
 				value(healthScale, old == null ? -1 : old.healthScale), target,
-				dead == null ? old != null && old.dead : dead);
+				dead == null ? old != null && old.dead : dead, equipment, icon);
 		}
 	}
 }
