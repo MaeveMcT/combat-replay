@@ -59,6 +59,7 @@ final class RecordedEvent
 
 	private static boolean usesDefinitionId(String type)
 	{
+		if (type.endsWith("_OBJECT_SPAWN") || type.endsWith("_OBJECT_DESPAWN")) return true;
 		switch (type)
 		{
 			case "HITSPLAT":

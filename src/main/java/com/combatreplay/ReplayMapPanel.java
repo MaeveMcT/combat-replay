@@ -118,12 +118,16 @@ final class ReplayMapPanel extends JPanel
 	{
 		encounterActorKeys.clear();
 		if (recording == null) return;
+		Map<String, ActorSnapshot> previousActors = new HashMap<>();
 		for (RecordedTick tick : recording.ticks)
 		{
 			for (ActorSnapshot actor : tick.actors)
 			{
 				if (actor.isLocalPlayer || actor.targetKey != null) encounterActorKeys.add(actor.key);
 				if (actor.targetKey != null) encounterActorKeys.add(actor.targetKey);
+				ActorSnapshot previous = previousActors.put(actor.key, actor);
+				if (previous != null && (previous.worldX != actor.worldX || previous.worldY != actor.worldY
+					|| !Objects.equals(previous.viewKey, actor.viewKey))) encounterActorKeys.add(actor.key);
 			}
 			for (RecordedEvent event : tick.events)
 			{
