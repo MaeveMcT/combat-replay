@@ -22,8 +22,21 @@ public final class PairingClient
 
     PairingClient(URI baseUri, HttpClient httpClient)
     {
+        validateBaseUri(baseUri);
         exchangeUri = baseUri.resolve("/api/v1/pairing/exchange");
         this.httpClient = httpClient;
+    }
+
+    private static void validateBaseUri(URI uri)
+    {
+        String host = uri.getHost();
+        boolean loopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+            || "::1".equals(host);
+        boolean secure = "https".equalsIgnoreCase(uri.getScheme());
+        if (host == null || uri.getUserInfo() != null || !(secure || loopback && "http".equalsIgnoreCase(uri.getScheme())))
+        {
+            throw new IllegalArgumentException("Device pairing requires HTTPS except on localhost");
+        }
     }
 
     public CompletableFuture<PairingCredentials> exchange(

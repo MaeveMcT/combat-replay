@@ -16,10 +16,11 @@ Format v1 writes the exact display names of every visible player into each priva
 2. Select **Start recording** while logged in.
 3. Complete or observe an encounter.
 4. Select **Stop and save**.
-5. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
-6. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
+5. To enable private web uploads, configure the web address, choose **Pair web device**, and enter the pairing code shown by the website.
+6. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
+7. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
 
-The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
+When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
 
 ## Limits
 

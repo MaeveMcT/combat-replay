@@ -1,11 +1,14 @@
 package com.combatreplay;
 
+import com.google.gson.Gson;
+import com.google.inject.Provides;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
@@ -42,7 +45,9 @@ import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.events.WallObjectDespawned;
 import net.runelite.api.events.WallObjectSpawned;
+import net.runelite.client.RuneLiteProperties;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -67,8 +72,16 @@ public class CombatReplayPlugin extends Plugin
 	@Inject private CombatRecorder recorder;
 	@Inject private RecordingStore store;
 	@Inject private ScheduledExecutorService executor;
+	@Inject private CombatReplayConfig config;
+	@Inject private ConfigManager configManager;
 
 	private NavigationButton navigationButton;
+
+	@Provides
+	CombatReplayConfig provideConfig(ConfigManager manager)
+	{
+		return manager.getConfig(CombatReplayConfig.class);
+	}
 
 	@Override
 	protected void startUp()
@@ -82,6 +95,7 @@ public class CombatReplayPlugin extends Plugin
 			.build();
 		clientToolbar.addNavigation(navigationButton);
 		panel.setToggleRecording(() -> clientThread.invoke(this::toggleRecording));
+		panel.setPairDevice(this::pairDevice);
 		log.debug("Combat Replay started");
 	}
 
@@ -144,6 +158,35 @@ public class CombatReplayPlugin extends Plugin
 		panel.recordingStarted();
 	}
 
+	private void pairDevice(String code)
+	{
+		final PairingClient pairingClient;
+		try
+		{
+			pairingClient = new PairingClient(URI.create(config.webAddress()));
+		}
+		catch (IllegalArgumentException exception)
+		{
+			panel.pairingFinished(false);
+			return;
+		}
+		String pluginVersion = getClass().getPackage().getImplementationVersion();
+		pairingClient.exchange(code, "RuneLite desktop",
+			pluginVersion == null ? "development" : pluginVersion,
+			RuneLiteProperties.getVersion() == null ? "unknown" : RuneLiteProperties.getVersion())
+			.whenComplete((credentials, error) ->
+			{
+				if (error != null)
+				{
+					panel.pairingFinished(false);
+					return;
+				}
+				configManager.setConfiguration("combatreplay", "deviceToken", credentials.getToken());
+				configManager.setConfiguration("combatreplay", "uploadEnabled", true);
+				panel.pairingFinished(true);
+			});
+	}
+
 	private void save(CombatRecording recording, boolean updatePanel)
 	{
 		if (recording == null || recording.ticks.isEmpty())
@@ -160,6 +203,7 @@ public class CombatReplayPlugin extends Plugin
 			{
 				Path path = store.save(recording);
 				log.debug("Saved combat recording to {}", path);
+				queueUpload(path, recording.recordingId);
 				if (updatePanel)
 				{
 					panel.recordingStopped(recording, "Saved " + path.getFileName(), true);
@@ -174,6 +218,25 @@ public class CombatReplayPlugin extends Plugin
 				}
 			}
 		});
+	}
+
+	private void queueUpload(Path path, String recordingId)
+	{
+		String token = config.deviceToken();
+		if (!config.uploadEnabled() || token == null || token.trim().isEmpty())
+		{
+			return;
+		}
+		try
+		{
+			ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor);
+			UploadSidecarStore sidecars = new UploadSidecarStore(new Gson(), store.directory());
+			new ReplayUploadQueue(client, sidecars, executor, token).enqueue(path, recordingId);
+		}
+		catch (IllegalArgumentException exception)
+		{
+			log.warn("Combat Replay web address is invalid");
+		}
 	}
 
 	@Subscribe

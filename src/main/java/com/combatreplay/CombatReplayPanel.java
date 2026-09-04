@@ -9,6 +9,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.BorderFactory;
@@ -39,11 +40,13 @@ final class CombatReplayPanel extends PluginPanel
 	private final JLabel liveStats = new JShadowedLabel(" ");
 	private final JButton recordButton = new JButton("Start recording");
 	private final JButton openCurrent = new JButton("Open last replay");
+	private final JButton pairDevice = new JButton("Pair web device");
 	private final DefaultListModel<StoredRecording> libraryModel = new DefaultListModel<>();
 	private final JList<StoredRecording> library = new JList<>(libraryModel);
 	private final List<ReplayViewerFrame> viewers = new ArrayList<>();
 	private CombatRecording current;
 	private Runnable toggleRecording;
+	private Consumer<String> pairDeviceAction;
 
 	@Inject
 	CombatReplayPanel(RecordingStore store)
@@ -54,10 +57,23 @@ final class CombatReplayPanel extends PluginPanel
 		add(libraryCard()); add(Box.createVerticalStrut(6)); add(noteCard());
 		recordButton.addActionListener(event -> { if (toggleRecording != null) toggleRecording.run(); });
 		openCurrent.addActionListener(event -> open(current));
+		pairDevice.addActionListener(event -> requestPairing());
 		refreshLibrary();
 	}
 
 	void setToggleRecording(Runnable action) { toggleRecording = action; }
+	void setPairDevice(Consumer<String> action) { pairDeviceAction = action; }
+
+	void pairingFinished(boolean paired)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			pairDevice.setEnabled(true);
+			pairDevice.setText(paired ? "Web device paired" : "Pair web device");
+			status.setText(paired ? "Future recordings will upload privately" : "Could not pair web device");
+			status.setForeground(paired ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.PROGRESS_ERROR_COLOR);
+		});
+	}
 
 	void recordingStarted()
 	{
@@ -89,6 +105,7 @@ final class CombatReplayPanel extends PluginPanel
 	void reset()
 	{
 		toggleRecording = null;
+		pairDeviceAction = null;
 		SwingUtilities.invokeLater(() ->
 		{
 			for (ReplayViewerFrame viewer : new ArrayList<>(viewers)) viewer.dispose();
@@ -106,8 +123,8 @@ final class CombatReplayPanel extends PluginPanel
 	{
 		JPanel panel = card(); panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 		status.setAlignmentX(LEFT_ALIGNMENT); liveStats.setForeground(ColorScheme.LIGHT_GRAY_COLOR); liveStats.setAlignmentX(LEFT_ALIGNMENT);
-		configureButton(recordButton); configureButton(openCurrent); openCurrent.setEnabled(false);
-		panel.add(status); panel.add(Box.createVerticalStrut(3)); panel.add(liveStats); panel.add(Box.createVerticalStrut(7)); panel.add(recordButton); panel.add(Box.createVerticalStrut(4)); panel.add(openCurrent); return panel;
+		configureButton(recordButton); configureButton(openCurrent); configureButton(pairDevice); openCurrent.setEnabled(false);
+		panel.add(status); panel.add(Box.createVerticalStrut(3)); panel.add(liveStats); panel.add(Box.createVerticalStrut(7)); panel.add(recordButton); panel.add(Box.createVerticalStrut(4)); panel.add(openCurrent); panel.add(Box.createVerticalStrut(4)); panel.add(pairDevice); return panel;
 	}
 
 	private JPanel libraryCard()
@@ -148,6 +165,16 @@ final class CombatReplayPanel extends PluginPanel
 			});
 			viewer.setVisible(true);
 		});
+	}
+
+	private void requestPairing()
+	{
+		if (pairDeviceAction == null) return;
+		String code = JOptionPane.showInputDialog(this, "Pairing code from the Combat Replay website");
+		if (code == null || code.trim().isEmpty()) return;
+		pairDevice.setEnabled(false);
+		pairDevice.setText("Pairing…");
+		pairDeviceAction.accept(code.trim());
 	}
 
 	private void renameSelected()
