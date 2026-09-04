@@ -32,6 +32,7 @@ final class EventTimeline extends JSlider
 		this.recording = recording;
 		setMinimum(0);
 		setMaximum(recording == null ? 0 : Math.max(0, recording.ticks.size() - 1));
+		setValue(0);
 		repaint();
 	}
 

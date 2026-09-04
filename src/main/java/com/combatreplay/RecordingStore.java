@@ -20,16 +20,23 @@ import net.runelite.client.RuneLite;
 final class RecordingStore
 {
 	private final Gson gson;
+	private final Path directory;
 
 	@Inject
 	RecordingStore(Gson gson)
 	{
-		this.gson = gson.newBuilder().setPrettyPrinting().create();
+		this(gson, RuneLite.RUNELITE_DIR.toPath().resolve("combat-replay"));
+	}
+
+	RecordingStore(Gson gson, Path directory)
+	{
+		this.gson = gson.newBuilder().create();
+		this.directory = directory;
 	}
 
 	Path directory()
 	{
-		return RuneLite.RUNELITE_DIR.toPath().resolve("combat-replay");
+		return directory;
 	}
 
 	Path save(CombatRecording recording) throws IOException
@@ -67,7 +74,7 @@ final class RecordingStore
 	{
 		try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8))
 		{
-			return gson.fromJson(reader, CombatRecording.class);
+			return RecordingFormat.decode(gson.fromJson(reader, RecordingFormat.FileRecording.class));
 		}
 	}
 
@@ -95,7 +102,7 @@ final class RecordingStore
 		{
 			try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
 			{
-				gson.toJson(recording, writer);
+				gson.toJson(RecordingFormat.encode(recording), writer);
 			}
 			try
 			{

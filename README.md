@@ -19,7 +19,7 @@ Player names are never written to recordings. Other players receive recording-lo
 5. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
 6. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
 
-The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as JSON under RuneLite's `combat-replay` directory.
+The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as JSON under RuneLite's `combat-replay` directory. The current format stores compact per-tick deltas, a recording-level item-name dictionary, and packed scene observations; replays are reconstructed into complete tick states when opened.
 
 ## Limits
 

@@ -11,7 +11,7 @@ import java.util.Map;
 
 final class CombatRecording
 {
-	static final int FORMAT_VERSION = 4;
+	static final int FORMAT_VERSION = 5;
 	private static final DateTimeFormatter NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 		.withZone(ZoneId.systemDefault());
 
@@ -97,6 +97,12 @@ final class CombatRecording
 		int seconds = Math.max(0, ticks.size() * 3 / 5);
 		return encounter + " — " + result + " — " + String.format("%d:%02d", seconds / 60, seconds % 60)
 			+ " — " + NAME_TIME.format(Instant.ofEpochMilli(startedAtEpochMillis));
+	}
+
+	static CombatRecording restored(long startedAt, long endedAt, String name, List<RecordedTick> ticks)
+	{
+		return new CombatRecording(FORMAT_VERSION, startedAt, endedAt, name,
+			Collections.unmodifiableList(new ArrayList<>(ticks)));
 	}
 
 	CombatRecording renamed(String newName)
