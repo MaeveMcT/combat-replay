@@ -31,7 +31,7 @@
         "base_prayer": 77,
         "inventory": [{ "slot": 0, "item_id": 385, "quantity": 2 }],
         "equipment": [{ "slot": 3, "item_id": 4151, "quantity": 1 }],
-        "active_prayers": ["PROTECT_FROM_MELEE"]
+        "active_prayers": ["PROTECT_FROM_MELEE", "PIETY"]
       },
       "actors": {
         "upsert": [

@@ -12,9 +12,12 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.swing.JPanel;
 import net.runelite.api.CollisionDataFlag;
@@ -31,6 +34,7 @@ final class ReplayMapPanel extends JPanel
 	private CameraMode cameraMode = CameraMode.FOLLOW_ACTION;
 	private ActorFilter actorFilter = ActorFilter.ENCOUNTER;
 	private final Map<String, SceneTileSnapshot> observedTiles = new LinkedHashMap<>();
+	private final Set<String> encounterActorKeys = new HashSet<>();
 	private Consumer<String> selectionListener;
 	private double centerX;
 	private double centerY;
@@ -96,6 +100,7 @@ final class ReplayMapPanel extends JPanel
 		this.recording = recording;
 		tickIndex = 0;
 		selectedKey = findLocalKey(recording == null || recording.ticks.isEmpty() ? null : recording.ticks.get(0));
+		rebuildEncounterActors();
 		rebuildTiles();
 		updateCamera();
 		repaint();
@@ -107,6 +112,27 @@ final class ReplayMapPanel extends JPanel
 		rebuildTiles();
 		updateCamera();
 		repaint();
+	}
+
+	private void rebuildEncounterActors()
+	{
+		encounterActorKeys.clear();
+		if (recording == null) return;
+		for (RecordedTick tick : recording.ticks)
+		{
+			for (ActorSnapshot actor : tick.actors)
+			{
+				if (actor.isLocalPlayer || actor.targetKey != null) encounterActorKeys.add(actor.key);
+				if (actor.targetKey != null) encounterActorKeys.add(actor.targetKey);
+			}
+			for (RecordedEvent event : tick.events)
+			{
+				if (!"HITSPLAT".equals(event.type) && !"DEATH".equals(event.type)
+					&& !"PROJECTILE".equals(event.type)) continue;
+				if (event.actorKey != null) encounterActorKeys.add(event.actorKey);
+				if (event.targetKey != null) encounterActorKeys.add(event.targetKey);
+			}
+		}
 	}
 
 	private void rebuildTiles()
@@ -128,8 +154,12 @@ final class ReplayMapPanel extends JPanel
 		if (cameraMode == CameraMode.WHOLE_ENCOUNTER)
 		{
 			double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
-			for (RecordedTick tick : recording.ticks) for (ActorSnapshot actor : tick.actors)
+			RecordedTick current = currentTick(); ActorSnapshot currentFocus = actor(current, selectedKey);
+			if (currentFocus == null) currentFocus = actor(current, findLocalKey(current));
+			String currentView = currentFocus == null ? current.viewKey : currentFocus.viewKey;
+			for (RecordedTick tick : recording.ticks) for (ActorSnapshot actor : visibleActors(tick))
 			{
+				if (!Objects.equals(currentView, actor.viewKey)) continue;
 				double x = mapX(tick, actor), y = mapY(tick, actor);
 				minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
 			}
@@ -211,7 +241,6 @@ final class ReplayMapPanel extends JPanel
 		RecordedTick current = currentTick();
 		for (ActorSnapshot now : visibleActors(current))
 		{
-			if (selectedKey != null && !selectedKey.equals(now.key) && actorFilter == ActorFilter.ENCOUNTER) continue;
 			g.setColor(selectedKey != null && selectedKey.equals(now.key) ? new Color(255, 205, 55, 210) : new Color(120, 175, 220, 110));
 			g.setStroke(new BasicStroke(selectedKey != null && selectedKey.equals(now.key) ? 3f : 2f));
 			Point previous = null;
@@ -250,13 +279,15 @@ final class ReplayMapPanel extends JPanel
 			g.fillOval(x - diameter / 2, y - diameter / 2, diameter, diameter); g.setColor(new Color(15, 15, 15)); g.drawOval(x - diameter / 2, y - diameter / 2, diameter, diameter);
 			String displayName = actor.displayName();
 			g.setColor(Color.WHITE); FontMetrics fm = g.getFontMetrics(); g.drawString(displayName, x - fm.stringWidth(displayName) / 2, y + diameter / 2 + fm.getAscent() + 2);
-			String prayerBadge = actor.overheadIcon == null ? null : prayerBadge(actor.overheadIcon);
-			if (prayerBadge == null && actor.isLocalPlayer
-				&& tick.activePrayers != null && !tick.activePrayers.isEmpty()) prayerBadge = "P";
-			if (prayerBadge != null)
+			List<String> prayerBadges = prayerBadges(tick, actor);
+			for (int i = 0; i < prayerBadges.size(); i++)
 			{
-				g.setColor(new Color(85, 175, 255)); g.fillOval(x - 7, y - diameter / 2 - 17, 14, 14);
-				g.setColor(Color.WHITE); g.drawString(prayerBadge, x - 4, y - diameter / 2 - 5);
+				String badge = prayerBadges.get(i); int badgeWidth = Math.max(16, g.getFontMetrics().stringWidth(badge) + 6);
+				int badgeX = x - (prayerBadges.size() * 22) / 2 + i * 22;
+				int badgeY = y - diameter / 2 - 19;
+				g.setColor(i == 0 && actor.overheadIcon != null ? new Color(65, 145, 245) : new Color(135, 85, 215));
+				g.fillRoundRect(badgeX, badgeY, badgeWidth, 16, 6, 6);
+				g.setColor(Color.WHITE); g.drawString(badge, badgeX + (badgeWidth - g.getFontMetrics().stringWidth(badge)) / 2, badgeY + 12);
 			}
 		}
 	}
@@ -350,13 +381,25 @@ final class ReplayMapPanel extends JPanel
 
 	private List<ActorSnapshot> visibleActors(RecordedTick tick)
 	{
-		if (actorFilter == ActorFilter.ALL) return tick.actors;
-		ActorSnapshot local = actor(tick, findLocalKey(tick)); List<ActorSnapshot> result = new ArrayList<>();
+		ActorSnapshot focus = actor(tick, selectedKey);
+		if (focus == null) focus = actor(tick, findLocalKey(tick));
+		List<ActorSnapshot> result = new ArrayList<>();
 		for (ActorSnapshot actor : tick.actors)
 		{
-			boolean nearby = local == null || (actor.worldViewId == local.worldViewId && Math.abs(actor.sceneX - local.sceneX) <= 24 && Math.abs(actor.sceneY - local.sceneY) <= 24);
-			boolean focused = actor.isLocalPlayer || actor.targetKey != null || isTarget(tick, actor.key) || hasCombatEvent(tick, actor.key);
-			if (nearby && (actorFilter == ActorFilter.NEARBY || focused || actor.key.equals(selectedKey))) result.add(actor);
+			if (focus != null && (actor.worldViewId != focus.worldViewId || actor.plane != focus.plane)) continue;
+			if (actorFilter == ActorFilter.ALL)
+			{
+				result.add(actor);
+				continue;
+			}
+			if (actorFilter == ActorFilter.NEARBY)
+			{
+				if (focus == null || (Math.abs(actor.sceneX - focus.sceneX) <= 24
+					&& Math.abs(actor.sceneY - focus.sceneY) <= 24)) result.add(actor);
+				continue;
+			}
+			if (actor.isLocalPlayer || actor.key.equals(selectedKey)
+				|| encounterActorKeys.contains(actor.key)) result.add(actor);
 		}
 		return result;
 	}
@@ -372,8 +415,6 @@ final class ReplayMapPanel extends JPanel
 		if (nearest != null) { selectedKey = nearest; cameraMode = CameraMode.FOLLOW_ACTION; if (selectionListener != null) selectionListener.accept(nearest); repaint(); }
 	}
 
-	private boolean isTarget(RecordedTick tick, String key) { for (ActorSnapshot actor : tick.actors) if (key.equals(actor.targetKey)) return true; return false; }
-	private boolean hasCombatEvent(RecordedTick tick, String key) { for (RecordedEvent event : tick.events) if (key.equals(event.actorKey) && ("HITSPLAT".equals(event.type) || "DEATH".equals(event.type))) return true; return false; }
 	private RecordedTick currentTick() { return recording.ticks.get(tickIndex); }
 	private static ActorSnapshot actor(RecordedTick tick, String key) { if (tick != null && key != null) for (ActorSnapshot actor : tick.actors) if (key.equals(actor.key)) return actor; return null; }
 	private static Map<String, ActorSnapshot> byKey(RecordedTick tick) { Map<String, ActorSnapshot> map = new HashMap<>(); for (ActorSnapshot actor : tick.actors) map.put(actor.key, actor); return map; }
@@ -387,12 +428,47 @@ final class ReplayMapPanel extends JPanel
 	private int px(double x) { return (int) Math.round(getWidth() / 2.0 + (x - centerX) * pixelsPerTile); }
 	private int py(double y) { return (int) Math.round(getHeight() / 2.0 - (y - centerY) * pixelsPerTile); }
 	private static String pretty(String value) { return value == null ? "" : value.toLowerCase().replace('_', ' '); }
-	private static String prayerBadge(String icon)
+	private static List<String> prayerBadges(RecordedTick tick, ActorSnapshot actor)
+	{
+		List<String> badges = new ArrayList<>();
+		if (actor.overheadIcon != null) badges.add(protectionPrayerBadge(actor.overheadIcon));
+		if (actor.isLocalPlayer && tick.activePrayers != null)
+		{
+			for (String prayer : tick.activePrayers)
+			{
+				String badge = offensivePrayerBadge(prayer);
+				if (badge != null && !badges.contains(badge)) badges.add(badge);
+			}
+		}
+		return badges;
+	}
+
+	private static String protectionPrayerBadge(String icon)
 	{
 		if (icon.contains("MELEE")) return "M";
 		if (icon.contains("RANGE")) return "R";
 		if (icon.contains("MAG")) return "A";
 		return "P";
+	}
+
+	static String offensivePrayerBadge(String prayer)
+	{
+		if (prayer == null || prayer.startsWith("PROTECT_") || "RETRIBUTION".equals(prayer)
+			|| "REDEMPTION".equals(prayer) || "SMITE".equals(prayer) || "PRESERVE".equals(prayer)
+			|| "RAPID_HEAL".equals(prayer) || "RAPID_RESTORE".equals(prayer)) return null;
+		switch (prayer)
+		{
+			case "PIETY": return "Pi";
+			case "RIGOUR": return "Ri";
+			case "AUGURY": return "Au";
+			case "CHIVALRY": return "Ch";
+			case "DEADEYE": return "De";
+			case "MYSTIC_VIGOUR": return "MV";
+			default:
+				StringBuilder badge = new StringBuilder();
+				for (String word : prayer.split("_")) if (!word.isEmpty()) badge.append(word.charAt(0));
+				return badge.length() > 2 ? badge.substring(0, 2) : badge.toString();
+		}
 	}
 	private static boolean blocksMovement(int flags)
 	{
