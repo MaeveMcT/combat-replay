@@ -126,6 +126,73 @@ public class ReplayUploadClientTest
         throw new AssertionError("Expected upload to fail");
     }
 
+    @Test
+    public void storageFullPausesPersistentlyUntilExplicitRetry() throws Exception
+    {
+        java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean full = new java.util.concurrent.atomic.AtomicBoolean(true);
+        server.createContext("/api/v1/replays", exchange ->
+        {
+            requests.incrementAndGet();
+            respond(exchange, full.get() ? 409 : 201,
+                full.get() ? "{\"error\":\"storage_full\"}" : response("awaiting_upload"));
+        });
+        server.createContext("/api/v1/replays/42/upload", exchange ->
+        {
+            exchange.getRequestBody().readAllBytes();
+            respond(exchange, 200, response("uploaded"));
+        });
+        server.createContext("/api/v1/replays/42/complete", exchange -> respond(exchange, 202, response("ready")));
+        Path source = temporary.newFile("quota-recording.json").toPath();
+        Files.writeString(source, "{}", StandardCharsets.UTF_8);
+        UploadSidecarStore sidecars = new UploadSidecarStore(new com.google.gson.Gson(), temporary.getRoot().toPath());
+        java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        java.util.concurrent.CountDownLatch paused = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
+        ReplayUploadClient client = new ReplayUploadClient(baseUri, Runnable::run);
+        try (ReplayUploadQueue queue = new ReplayUploadQueue(client, sidecars, executor, "token", message ->
+        {
+            if (message.startsWith("Storage full")) paused.countDown();
+            if (message.equals("Web replay ready")) ready.countDown();
+        }))
+        {
+            queue.enqueue(source, RECORDING_ID);
+            assertTrue(paused.await(5, TimeUnit.SECONDS));
+            UploadSidecarState state = sidecars.load(RECORDING_ID);
+            assertEquals("paused", state.status);
+            assertEquals("storage_full", state.failureCode);
+            assertEquals(0L, state.nextAttemptAtEpochMillis);
+            assertEquals(1, requests.get());
+            assertTrue(Files.exists(source));
+            // A fresh queue also respects the persisted pause, including after a restart.
+            try (ReplayUploadQueue resumed = new ReplayUploadQueue(new ReplayUploadClient(baseUri, Runnable::run), sidecars, executor, "token"))
+            {
+                resumed.enqueue(source, RECORDING_ID);
+                executor.submit(() -> { }).get(5, TimeUnit.SECONDS);
+                assertEquals(1, requests.get());
+            }
+            full.set(false);
+            queue.enqueue(source, RECORDING_ID, true);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            assertEquals(2, requests.get());
+            assertEquals("ready", sidecars.load(RECORDING_ID).status);
+            assertTrue(Files.exists(source));
+        }
+        finally
+        {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void arbitraryServerErrorsAreNotRetained()
+    {
+        ReplayUploadException failure = new ReplayUploadException("Rejected", 409)
+            .withFailureCode("sensitive server payload");
+        assertEquals(null, failure.getFailureCode());
+        assertTrue(!failure.isTransientFailure());
+    }
+
     private static String response(String status)
     {
         return "{\"id\":42,\"recording_id\":\"" + RECORDING_ID + "\",\"status\":\"" + status + "\","

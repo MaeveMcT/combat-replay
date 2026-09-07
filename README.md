@@ -20,6 +20,10 @@ Format v1 writes the exact display names of every visible player into each priva
 6. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
 7. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
 
+The web service supports public email-verified accounts. Free keeps the current web viewer with limited storage; Pro currently grants more storage through an administrator, with no actual payments yet. Web plans never restrict local recording or desktop playback.
+
+If web storage is full, the uploader persists a paused state and retains the local file. Free space on the web or obtain more storage, then select the recording in the library and choose **Upload / retry**. Selecting a recording shows its stored upload status; hover the status for full guidance. A quota pause never retries automatically, including after restart. Revoked devices must be paired again. Upload work is stopped on plugin shutdown.
+
 When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
 
 ## Limits

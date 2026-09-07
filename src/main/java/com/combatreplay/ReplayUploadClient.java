@@ -19,12 +19,14 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.zip.GZIPOutputStream;
 
-public final class ReplayUploadClient
+public final class ReplayUploadClient implements AutoCloseable
 {
     private static final Gson GSON = new Gson();
     private final URI baseUri;
     private final HttpClient httpClient;
     private final Executor preparationExecutor;
+    private volatile boolean closed;
+    private final java.util.Set<CompletableFuture<?>> requests = new java.util.HashSet<>();
 
     public ReplayUploadClient(URI baseUri, Executor preparationExecutor)
     {
@@ -96,10 +98,13 @@ public final class ReplayUploadClient
         return sendResponse(request, expectedStatuses).thenApply(ReplayResponse::result);
     }
 
-    private CompletableFuture<ReplayResponse> sendResponse(HttpRequest request, int... expectedStatuses)
+    private synchronized CompletableFuture<ReplayResponse> sendResponse(HttpRequest request, int... expectedStatuses)
     {
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .handle((response, error) ->
+        if (closed) return failed(new ReplayUploadException("Upload client closed", 0));
+        CompletableFuture<HttpResponse<String>> pending = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        requests.add(pending);
+        pending.whenComplete((response, error) -> removeRequest(pending));
+        return pending.handle((response, error) ->
             {
                 if (error != null)
                 {
@@ -112,8 +117,22 @@ public final class ReplayUploadClient
                 }
                 if (!expected)
                 {
+                    String code = null;
+                    try
+                    {
+                        ErrorResponse failure = GSON.fromJson(response.body(), ErrorResponse.class);
+                        if (response.statusCode() == 409 && failure != null)
+                        {
+                            code = failure.error;
+                        }
+                    }
+                    catch (RuntimeException ignored)
+                    {
+                        // Error pages are not necessarily JSON; retain only the status.
+                    }
                     throw new CompletionException(new ReplayUploadException(
-                        "Replay upload request failed with HTTP status " + response.statusCode(), response.statusCode()));
+                        "Replay upload request failed with HTTP status " + response.statusCode(), response.statusCode())
+                        .withFailureCode(code));
                 }
                 ReplayResponse payload = GSON.fromJson(response.body(), ReplayResponse.class);
                 if (payload == null || payload.id <= 0 || payload.recordingId == null || payload.status == null)
@@ -122,6 +141,19 @@ public final class ReplayUploadClient
                 }
                 return payload;
             });
+    }
+
+    private synchronized void removeRequest(CompletableFuture<?> request)
+    {
+        requests.remove(request);
+    }
+
+    @Override
+    public synchronized void close()
+    {
+        closed = true;
+        for (CompletableFuture<?> pending : new java.util.ArrayList<>(requests)) pending.cancel(true);
+        requests.clear();
     }
 
     private HttpRequest.Builder request(URI uri, String token)
@@ -148,7 +180,7 @@ public final class ReplayUploadClient
         }
     }
 
-    private static PreparedReplay prepare(Path source)
+    private PreparedReplay prepare(Path source)
     {
         Path compressed = null;
         try
@@ -161,6 +193,7 @@ public final class ReplayUploadClient
                 int read;
                 while ((read = input.read(buffer)) >= 0)
                 {
+                    if (closed) throw new IOException("Upload client closed");
                     output.write(buffer, 0, read);
                 }
             }
@@ -171,6 +204,7 @@ public final class ReplayUploadClient
                 byte[] buffer = new byte[64 * 1024];
                 while (input.read(buffer) >= 0)
                 {
+                    if (closed) throw new IOException("Upload client closed");
                     // DigestInputStream updates the checksum while the prepared file is consumed.
                 }
             }
@@ -251,6 +285,11 @@ public final class ReplayUploadClient
             this.sourceSha256 = sourceSha256;
             this.sourceByteSize = sourceByteSize;
         }
+    }
+
+    private static final class ErrorResponse
+    {
+        private String error;
     }
 
     private static final class ReplayResponse

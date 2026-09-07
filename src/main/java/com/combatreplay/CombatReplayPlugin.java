@@ -76,6 +76,8 @@ public class CombatReplayPlugin extends Plugin
 	@Inject private ConfigManager configManager;
 
 	private NavigationButton navigationButton;
+	private volatile boolean active;
+	private final java.util.Map<String, ReplayUploadQueue> uploadQueues = new java.util.HashMap<>();
 
 	@Provides
 	CombatReplayConfig provideConfig(ConfigManager manager)
@@ -86,6 +88,7 @@ public class CombatReplayPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		active = true;
 		BufferedImage icon = loadPanelIcon();
 		navigationButton = NavigationButton.builder()
 			.tooltip("Combat Replay")
@@ -96,12 +99,28 @@ public class CombatReplayPlugin extends Plugin
 		clientToolbar.addNavigation(navigationButton);
 		panel.setToggleRecording(() -> clientThread.invoke(this::toggleRecording));
 		panel.setPairDevice(this::pairDevice);
+		panel.setUpload(selected -> queueUpload(selected.path, selected.recording.recordingId, true));
+		panel.setUploadStatus(selected -> executor.execute(() ->
+		{
+			try
+			{
+				UploadSidecarState state = new UploadSidecarStore(new Gson(), store.directory())
+					.load(selected.recording.recordingId);
+				if (active) panel.uploadStatusChanged(ReplayUploadQueue.message(state));
+			}
+			catch (IOException exception)
+			{
+				if (active) panel.uploadStatusChanged("Could not read upload status");
+			}
+		}));
 		log.debug("Combat Replay started");
 	}
 
 	@Override
 	protected void shutDown()
 	{
+		active = false;
+		closeUploadQueues();
 		if (recorder.isRecording())
 		{
 			save(recorder.stop(), false);
@@ -181,6 +200,8 @@ public class CombatReplayPlugin extends Plugin
 					panel.pairingFinished(false);
 					return;
 				}
+				if (!active) return;
+				closeUploadQueues();
 				configManager.setConfiguration("combatreplay", "deviceToken", credentials.getToken());
 				configManager.setConfiguration("combatreplay", "uploadEnabled", true);
 				panel.pairingFinished(true);
@@ -222,16 +243,35 @@ public class CombatReplayPlugin extends Plugin
 
 	private void queueUpload(Path path, String recordingId)
 	{
+		queueUpload(path, recordingId, false);
+	}
+
+	private synchronized void closeUploadQueues()
+	{
+		for (ReplayUploadQueue queue : uploadQueues.values()) queue.close();
+		uploadQueues.clear();
+	}
+
+	private synchronized void queueUpload(Path path, String recordingId, boolean manualRetry)
+	{
+		if (!active) return;
 		String token = config.deviceToken();
 		if (!config.uploadEnabled() || token == null || token.trim().isEmpty())
 		{
+			if (manualRetry) panel.uploadStatusChanged("Pair a web device and enable uploads first");
 			return;
 		}
 		try
 		{
-			ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor);
-			UploadSidecarStore sidecars = new UploadSidecarStore(new Gson(), store.directory());
-			new ReplayUploadQueue(client, sidecars, executor, token).enqueue(path, recordingId);
+			ReplayUploadQueue queue = uploadQueues.get(recordingId);
+			if (queue == null)
+			{
+				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor);
+				UploadSidecarStore sidecars = new UploadSidecarStore(new Gson(), store.directory());
+				queue = new ReplayUploadQueue(client, sidecars, executor, token, panel::uploadStatusChanged);
+				uploadQueues.put(recordingId, queue);
+			}
+			queue.enqueue(path, recordingId, manualRetry);
 		}
 		catch (IllegalArgumentException exception)
 		{

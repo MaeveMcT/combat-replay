@@ -47,6 +47,9 @@ final class CombatReplayPanel extends PluginPanel
 	private CombatRecording current;
 	private Runnable toggleRecording;
 	private Consumer<String> pairDeviceAction;
+	private Consumer<StoredRecording> uploadAction;
+	private Consumer<StoredRecording> uploadStatusAction;
+	private final JLabel uploadStatus = new JShadowedLabel(" ");
 
 	@Inject
 	CombatReplayPanel(RecordingStore store)
@@ -63,6 +66,20 @@ final class CombatReplayPanel extends PluginPanel
 
 	void setToggleRecording(Runnable action) { toggleRecording = action; }
 	void setPairDevice(Consumer<String> action) { pairDeviceAction = action; }
+	void setUpload(Consumer<StoredRecording> action) { uploadAction = action; }
+	void setUploadStatus(Consumer<StoredRecording> action) { uploadStatusAction = action; }
+
+	void uploadStatusChanged(String message)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (uploadAction != null)
+			{
+				uploadStatus.setText(message.startsWith("Storage full") ? "Storage full — upload paused" : message);
+				uploadStatus.setToolTipText(message);
+			}
+		});
+	}
 
 	void pairingFinished(boolean paired)
 	{
@@ -106,6 +123,8 @@ final class CombatReplayPanel extends PluginPanel
 	{
 		toggleRecording = null;
 		pairDeviceAction = null;
+		uploadAction = null;
+		uploadStatusAction = null;
 		SwingUtilities.invokeLater(() ->
 		{
 			for (ReplayViewerFrame viewer : new ArrayList<>(viewers)) viewer.dispose();
@@ -136,7 +155,23 @@ final class CombatReplayPanel extends PluginPanel
 		JPanel actions = new JPanel(new java.awt.GridLayout(2, 2, 4, 4)); actions.setOpaque(false); actions.setAlignmentX(LEFT_ALIGNMENT);
 		JButton open = new JButton("Open"), rename = new JButton("Rename"), delete = new JButton("Delete"), reveal = new JButton("Reveal");
 		open.addActionListener(e -> open(library.getSelectedValue())); rename.addActionListener(e -> renameSelected()); delete.addActionListener(e -> deleteSelected()); reveal.addActionListener(e -> revealSelected());
-		actions.add(open); actions.add(rename); actions.add(delete); actions.add(reveal); panel.add(Box.createVerticalStrut(5)); panel.add(actions); return panel;
+		actions.add(open); actions.add(rename); actions.add(delete); actions.add(reveal); panel.add(Box.createVerticalStrut(5)); panel.add(actions);
+		JButton upload = new JButton("Upload / retry");
+		configureButton(upload);
+		upload.setToolTipText("After freeing web storage, select a recording and retry. The local file is retained.");
+		upload.addActionListener(event ->
+		{
+			StoredRecording selected = library.getSelectedValue();
+			if (selected != null && uploadAction != null) uploadAction.accept(selected);
+		});
+		library.addListSelectionListener(event ->
+		{
+			StoredRecording selected = library.getSelectedValue();
+			if (!event.getValueIsAdjusting() && selected != null && uploadStatusAction != null)
+				uploadStatusAction.accept(selected);
+		});
+		panel.add(Box.createVerticalStrut(5)); panel.add(upload); panel.add(uploadStatus);
+		return panel;
 	}
 
 	private JPanel noteCard()
