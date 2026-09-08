@@ -28,7 +28,8 @@
       "npc_definitions",
       "object_definitions",
       "projectile_lifecycle",
-      "local_combat_stats"
+      "local_combat_stats",
+      "actor_movement_animations"
     ]
   },
   "dictionaries": {
@@ -154,7 +155,7 @@
             "size": 1,
             "orientation": 0,
             "animation_id": null,
-            "pose_animation_id": null,
+            "pose_animation_id": 808,
             "health_ratio": null,
             "health_scale": null,
             "target_key": "player-2",
@@ -166,7 +167,18 @@
                 "quantity": 1
               }
             ],
-            "overhead_icon": null
+            "overhead_icon": null,
+            "combat_level": 126,
+            "movement_animations": {
+              "idle": 808,
+              "idle_rotate_left": null,
+              "idle_rotate_right": null,
+              "walk": 808,
+              "walk_rotate_left": null,
+              "walk_rotate_right": null,
+              "walk_rotate_180": null,
+              "run": null
+            }
           },
           {
             "key": "player-2",
@@ -191,7 +203,18 @@
             "target_key": "player-1",
             "dead": false,
             "visible_equipment": [],
-            "overhead_icon": null
+            "overhead_icon": null,
+            "combat_level": 674,
+            "movement_animations": {
+              "idle": 808,
+              "idle_rotate_left": 808,
+              "idle_rotate_right": 808,
+              "walk": 808,
+              "walk_rotate_left": 819,
+              "walk_rotate_right": 819,
+              "walk_rotate_180": 820,
+              "run": 824
+            }
           }
         ],
         "remove": []
@@ -362,7 +385,18 @@
             "local_x": 1472,
             "local_y": 1344,
             "plane": 0,
-            "target_key": "player-2"
+            "target_key": "player-2",
+            "combat_level": 126,
+            "movement_animations": {
+              "idle": null,
+              "idle_rotate_left": null,
+              "idle_rotate_right": null,
+              "walk": null,
+              "walk_rotate_left": null,
+              "walk_rotate_right": null,
+              "walk_rotate_180": null,
+              "run": null
+            }
           },
           {
             "key": "tornado-1",
@@ -464,7 +498,18 @@
             "scene_x": 12,
             "scene_y": 10,
             "local_x": 1600,
-            "local_y": 1344
+            "local_y": 1344,
+            "combat_level": 126,
+            "movement_animations": {
+              "idle": null,
+              "idle_rotate_left": null,
+              "idle_rotate_right": null,
+              "walk": null,
+              "walk_rotate_left": null,
+              "walk_rotate_right": null,
+              "walk_rotate_180": null,
+              "run": null
+            }
           },
           {
             "key": "tornado-1",

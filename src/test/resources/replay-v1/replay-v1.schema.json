@@ -574,6 +574,23 @@
             "null"
           ],
           "maxLength": 100
+        },
+        "combat_level": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "movement_animations": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/movementAnimations"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -1123,6 +1140,46 @@
         },
         "magic": {
           "$ref": "#/$defs/skillLevel"
+        }
+      }
+    },
+    "movementAnimations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idle",
+        "idle_rotate_left",
+        "idle_rotate_right",
+        "walk",
+        "walk_rotate_left",
+        "walk_rotate_right",
+        "walk_rotate_180",
+        "run"
+      ],
+      "properties": {
+        "idle": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "idle_rotate_left": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "idle_rotate_right": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "walk": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "walk_rotate_left": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "walk_rotate_right": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "walk_rotate_180": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "run": {
+          "$ref": "#/$defs/nullableInteger"
         }
       }
     }

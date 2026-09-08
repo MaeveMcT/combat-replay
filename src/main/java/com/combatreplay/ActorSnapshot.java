@@ -30,6 +30,8 @@ final class ActorSnapshot
 	final boolean dead;
 	final List<ItemSnapshot> visibleEquipment;
 	final String overheadIcon;
+	final Integer combatLevel;
+	final MovementAnimations movementAnimations;
 
 	ActorSnapshot(String key, String kind, String label, int npcId,
 		int worldX, int worldY, int sceneX, int sceneY, int plane, int worldViewId,
@@ -82,6 +84,19 @@ final class ActorSnapshot
 		int poseAnimation, int healthRatio, int healthScale, String targetKey, boolean dead,
 		List<ItemSnapshot> visibleEquipment, String overheadIcon)
 	{
+		this(key, kind, label, isLocalPlayer, npcId, worldX, worldY, sceneX, sceneY,
+			localX, localY, plane, worldViewId, viewKey, size, orientation, animation,
+			poseAnimation, healthRatio, healthScale, targetKey, dead, visibleEquipment,
+			overheadIcon, null, null);
+	}
+
+	ActorSnapshot(String key, String kind, String label, boolean isLocalPlayer, int npcId,
+		int worldX, int worldY, int sceneX, int sceneY, int localX, int localY,
+		int plane, int worldViewId, String viewKey, int size, int orientation, int animation,
+		int poseAnimation, int healthRatio, int healthScale, String targetKey, boolean dead,
+		List<ItemSnapshot> visibleEquipment, String overheadIcon, Integer combatLevel,
+		MovementAnimations movementAnimations)
+	{
 		this.key = key;
 		this.kind = kind;
 		this.label = label;
@@ -107,6 +122,8 @@ final class ActorSnapshot
 		this.visibleEquipment = visibleEquipment == null ? null
 			: Collections.unmodifiableList(new ArrayList<>(visibleEquipment));
 		this.overheadIcon = overheadIcon;
+		this.combatLevel = combatLevel;
+		this.movementAnimations = movementAnimations;
 	}
 
 	String displayName()

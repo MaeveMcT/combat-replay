@@ -58,7 +58,8 @@ final class ReplayV1Format
         for (String capability : new String[]{
             "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
             "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
-            "npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats"
+            "npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats",
+            "actor_movement_animations"
         })
         {
             capabilities.add(capability);
@@ -273,6 +274,20 @@ final class ReplayV1Format
         value.add("visible_equipment", actor.visibleEquipment == null
             ? JsonNull.INSTANCE : items(actor.visibleEquipment));
         addNullable(value, "overhead_icon", actor.overheadIcon);
+        addNullableInteger(value, "combat_level", actor.combatLevel);
+        if (actor.movementAnimations != null)
+        {
+            JsonObject movement = new JsonObject();
+            addAvailableInteger(movement, "idle", actor.movementAnimations.idle);
+            addAvailableInteger(movement, "idle_rotate_left", actor.movementAnimations.idleRotateLeft);
+            addAvailableInteger(movement, "idle_rotate_right", actor.movementAnimations.idleRotateRight);
+            addAvailableInteger(movement, "walk", actor.movementAnimations.walk);
+            addAvailableInteger(movement, "walk_rotate_left", actor.movementAnimations.walkRotateLeft);
+            addAvailableInteger(movement, "walk_rotate_right", actor.movementAnimations.walkRotateRight);
+            addAvailableInteger(movement, "walk_rotate_180", actor.movementAnimations.walkRotate180);
+            addAvailableInteger(movement, "run", actor.movementAnimations.run);
+            value.add("movement_animations", movement);
+        }
         return value;
     }
 
@@ -652,6 +667,8 @@ final class ReplayV1Format
             : old == null ? 0 : old.worldViewId;
         List<ItemSnapshot> visible = old == null ? null : old.visibleEquipment;
         if (delta.has("visible_equipment")) visible = decodeItems(delta.get("visible_equipment"), names);
+        MovementAnimations movement = old == null ? null : old.movementAnimations;
+        if (delta.has("movement_animations")) movement = decodeMovement(object(delta, "movement_animations"));
         return new ActorSnapshot(key, kind, label, local, npcId,
             nullableIntValue(delta, "world_x", old == null ? 0 : old.worldX, 0),
             nullableIntValue(delta, "world_y", old == null ? 0 : old.worldY, 0),
@@ -668,7 +685,21 @@ final class ReplayV1Format
             nullableIntValue(delta, "health_scale", old == null ? -1 : old.healthScale, -1),
             nullableString(delta, "target_key", old == null ? null : old.targetKey),
             nullableBooleanValue(delta, "dead", old != null && old.dead, false), visible,
-            nullableString(delta, "overhead_icon", old == null ? null : old.overheadIcon));
+            nullableString(delta, "overhead_icon", old == null ? null : old.overheadIcon),
+            nullableInteger(delta, "combat_level", old == null ? null : old.combatLevel), movement);
+    }
+
+    private static MovementAnimations decodeMovement(JsonObject value)
+    {
+        if (value == null) return null;
+        return new MovementAnimations(nullableIntValue(value, "idle", -1, -1),
+            nullableIntValue(value, "idle_rotate_left", -1, -1),
+            nullableIntValue(value, "idle_rotate_right", -1, -1),
+            nullableIntValue(value, "walk", -1, -1),
+            nullableIntValue(value, "walk_rotate_left", -1, -1),
+            nullableIntValue(value, "walk_rotate_right", -1, -1),
+            nullableIntValue(value, "walk_rotate_180", -1, -1),
+            nullableIntValue(value, "run", -1, -1));
     }
 
     private static SceneTileSnapshot decodeTile(JsonObject value)

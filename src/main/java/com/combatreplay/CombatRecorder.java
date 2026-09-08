@@ -458,13 +458,21 @@ final class CombatRecorder
 		List<ItemSnapshot> visibleEquipment = npc ? new ArrayList<>() : snapshotVisibleEquipment((Player) actor);
 		String overheadIcon = npc || ((Player) actor).getOverheadIcon() == null
 			? null : ((Player) actor).getOverheadIcon().name();
+		int combatLevel = composition == null
+			? npc ? -1 : ((Player) actor).getCombatLevel() : composition.getCombatLevel();
+		MovementAnimations movementAnimations = new MovementAnimations(actor.getIdlePoseAnimation(),
+			actor.getIdleRotateLeft(), actor.getIdleRotateRight(), actor.getWalkAnimation(),
+			actor.getWalkRotateLeft(), actor.getWalkRotateRight(), actor.getWalkRotate180(),
+			actor.getRunAnimation());
 		return new ActorSnapshot(keyFor(actor), npc ? "NPC" : "PLAYER", label,
 			actor == client.getLocalPlayer(), npcId,
 			world.getX(), world.getY(), local.getSceneX(), local.getSceneY(), local.getX(), local.getY(),
-			world.getPlane(), viewIdentity(actor.getWorldView()), tileSize,
+			world.getPlane(), viewIdentity(actor.getWorldView()),
+			"view-" + viewIdentity(actor.getWorldView()), tileSize,
 			actor.getCurrentOrientation(), actor.getAnimation(), actor.getPoseAnimation(),
 			actor.getHealthRatio(), actor.getHealthScale(), keyFor(actor.getInteracting()), actor.isDead(),
-			visibleEquipment, overheadIcon);
+			visibleEquipment, overheadIcon, combatLevel < 0 ? null : combatLevel,
+			movementAnimations);
 	}
 
 	private void recordNpcDefinition(NPCComposition composition)

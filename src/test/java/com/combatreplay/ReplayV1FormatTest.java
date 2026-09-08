@@ -115,6 +115,9 @@ public class ReplayV1FormatTest
         }
 
         CombatRecording recording = ReplayV1Format.decode(fixture);
+        assertEquals(Integer.valueOf(126), recording.ticks.get(0).actors.get(0).combatLevel);
+        assertEquals(808, recording.ticks.get(0).actors.get(0).movementAnimations.idle);
+        assertEquals(808, recording.ticks.get(0).actors.get(0).movementAnimations.walk);
         assertEquals(117, recording.ticks.get(0).combatState.strengthCurrent);
         assertEquals(116, recording.ticks.get(1).combatState.strengthCurrent);
         assertEquals(116, recording.ticks.get(2).combatState.strengthCurrent);
