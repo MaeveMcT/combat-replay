@@ -57,7 +57,7 @@ final class RecordedEvent
 		this.evidenceEventIds = Collections.unmodifiableList(new ArrayList<>(evidenceEventIds));
 	}
 
-	private static boolean usesDefinitionId(String type)
+	static boolean usesDefinitionId(String type)
 	{
 		if (type.endsWith("_OBJECT_SPAWN") || type.endsWith("_OBJECT_DESPAWN")) return true;
 		switch (type)
@@ -79,7 +79,7 @@ final class RecordedEvent
 		}
 	}
 
-	private static boolean usesAmount(String type)
+	static boolean usesAmount(String type)
 	{
 		return "HITSPLAT".equals(type) || "RESOURCE_CHANGE".equals(type)
 			|| "PRAYER_CHANGE".equals(type);

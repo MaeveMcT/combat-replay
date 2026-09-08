@@ -2,6 +2,7 @@ package com.combatreplay;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -11,7 +12,9 @@ import java.util.Collections;
 import net.runelite.api.Client;
 import net.runelite.api.IndexedObjectSet;
 import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
+import net.runelite.api.Prayer;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.WorldView;
@@ -68,6 +71,106 @@ public class CombatRecorderV1Test
         assertEquals(Integer.valueOf(230), recording.gameRevision);
     }
 
+    @Test
+    public void recordsOnlyEffectiveUpgradedPrayerWhenRuneLiteReportsBoth()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
+        when(fixture.client.isPrayerActive(Prayer.EAGLE_EYE)).thenReturn(true);
+        when(fixture.client.isPrayerActive(Prayer.DEADEYE)).thenReturn(true);
+        when(fixture.client.isPrayerActive(Prayer.MYSTIC_MIGHT)).thenReturn(true);
+        when(fixture.client.isPrayerActive(Prayer.MYSTIC_VIGOUR)).thenReturn(true);
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        RecordedTick tick = fixture.recorder.stop().ticks.get(0);
+
+        assertEquals(new java.util.HashSet<>(java.util.Arrays.asList("DEADEYE", "MYSTIC_VIGOUR")),
+            new java.util.HashSet<>(tick.activePrayers));
+        java.util.Set<String> activated = new java.util.HashSet<>();
+        for (RecordedEvent event : tick.events)
+            if ("PRAYER_CHANGE".equals(event.type) && Integer.valueOf(1).equals(event.value))
+                activated.add(event.detail);
+        assertEquals(new java.util.HashSet<>(java.util.Arrays.asList("DEADEYE", "MYSTIC_VIGOUR")), activated);
+    }
+
+    @Test
+    public void assignsUniqueStableIdsToCapturedAndDerivedEvents()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        NPC victim = npc("Hunllef", fixture.worldView, 3201);
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.singletonList(victim));
+        when(fixture.client.getBoostedSkillLevel(net.runelite.api.Skill.HITPOINTS)).thenReturn(90, 80);
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        fixture.recorder.addEvent("HITSPLAT", victim, null, 16, 10, null, "mine");
+        fixture.recorder.addEvent("DEATH", victim, null, 0, 0, null, null);
+        fixture.recorder.captureTick();
+        CombatRecording recording = fixture.recorder.stop();
+
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (RecordedTick tick : recording.ticks)
+            for (RecordedEvent event : tick.events) ids.add(event.eventId);
+        assertFalse(ids.contains(null));
+        assertEquals(ids.size(), new java.util.HashSet<>(ids).size());
+
+        com.google.gson.JsonObject encoded = ReplayV1Format.encode(recording);
+        ReplayV1SemanticValidator.validate(encoded);
+        com.google.gson.JsonObject attribution = encoded.getAsJsonArray("ticks").get(1).getAsJsonObject()
+            .getAsJsonArray("events").get(2).getAsJsonObject();
+        assertEquals("kill_attribution", attribution.get("type").getAsString());
+        assertEquals("inferred", attribution.get("evidence").getAsString());
+        assertEquals("terminal_hitsplat_local_v1", attribution.get("rule_id").getAsString());
+        assertEquals(2, attribution.getAsJsonArray("evidence_event_ids").size());
+    }
+
+    @Test
+    public void emitsLocalKillAttributionWithSupportingEvidence()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        NPC victim = npc("Hunllef", fixture.worldView, 3201);
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.singletonList(victim));
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        fixture.recorder.addEvent("HITSPLAT", victim, null, 16, 24, null, "mine");
+        fixture.recorder.addEvent("DEATH", victim, null, 0, 0, null, null);
+
+        RecordedEvent attribution = fixture.recorder.stop().ticks.get(0).events.stream()
+            .filter(event -> "KILL_ATTRIBUTION".equals(event.type)).findFirst().orElse(null);
+
+        assertNotNull(attribution);
+        assertEquals(fixture.recorder.keyFor(fixture.local), attribution.actorKey);
+        assertEquals(fixture.recorder.keyFor(victim), attribution.targetKey);
+        assertEquals("inferred", attribution.evidence);
+        assertEquals("terminal_hitsplat_local_v1", attribution.ruleId);
+        assertEquals(2, attribution.evidenceEventIds.size());
+    }
+
+    @Test
+    public void emitsRemoteKillAttributionForUniqueMatchingProjectile()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        Player attacker = player("Bob", fixture.worldView, 3201);
+        fixture.withActors(java.util.Arrays.asList(fixture.local, attacker), Collections.emptyList());
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        fixture.recorder.addEvent("PROJECTILE", attacker, fixture.local, 123, 0, null, null);
+        fixture.recorder.addEvent("HITSPLAT", fixture.local, null, 16, 18, null, "other");
+        fixture.recorder.addEvent("DEATH", fixture.local, null, 0, 0, null, null);
+
+        RecordedEvent attribution = fixture.recorder.stop().ticks.get(0).events.stream()
+            .filter(event -> "KILL_ATTRIBUTION".equals(event.type)).findFirst().orElse(null);
+
+        assertNotNull(attribution);
+        assertEquals(fixture.recorder.keyFor(attacker), attribution.actorKey);
+        assertEquals(fixture.recorder.keyFor(fixture.local), attribution.targetKey);
+        assertEquals("terminal_hitsplat_projectile_v1", attribution.ruleId);
+        assertEquals(3, attribution.evidenceEventIds.size());
+    }
+
     private static Player player(String name, WorldView worldView, int worldX)
     {
         Player player = mock(Player.class);
@@ -80,5 +183,55 @@ public class CombatRecorderV1Test
         when(player.getAnimation()).thenReturn(-1);
         when(player.getPoseAnimation()).thenReturn(-1);
         return player;
+    }
+
+    private static NPC npc(String name, WorldView worldView, int worldX)
+    {
+        NPC npc = mock(NPC.class);
+        NPCComposition composition = mock(NPCComposition.class);
+        when(composition.getName()).thenReturn(name);
+        when(composition.getSize()).thenReturn(1);
+        when(npc.getTransformedComposition()).thenReturn(composition);
+        when(npc.getName()).thenReturn(name);
+        when(npc.getWorldView()).thenReturn(worldView);
+        when(npc.getWorldLocation()).thenReturn(new WorldPoint(worldX, 3200, 0));
+        when(npc.getLocalLocation()).thenReturn(new LocalPoint(1280 + (worldX - 3200) * 128, 1280));
+        when(npc.getHealthRatio()).thenReturn(-1);
+        when(npc.getHealthScale()).thenReturn(-1);
+        when(npc.getAnimation()).thenReturn(-1);
+        when(npc.getPoseAnimation()).thenReturn(-1);
+        return npc;
+    }
+
+    private static final class RecorderFixture
+    {
+        private final Client client = mock(Client.class);
+        private final WorldView worldView = mock(WorldView.class);
+        private final Scene scene = mock(Scene.class);
+        private final Player local = player("Alice", worldView, 3200);
+        private final CombatRecorder recorder = new CombatRecorder(client);
+
+        private RecorderFixture()
+        {
+            when(client.getTopLevelWorldView()).thenReturn(worldView);
+            when(client.getLocalPlayer()).thenReturn(local);
+            when(client.getGameCycle()).thenReturn(1234);
+            when(client.getTickCount()).thenReturn(77);
+            when(worldView.getBaseX()).thenReturn(3190);
+            when(worldView.getBaseY()).thenReturn(3190);
+            when(worldView.getPlane()).thenReturn(0);
+            when(worldView.getScene()).thenReturn(scene);
+            when(scene.getTiles()).thenReturn(new Tile[4][0][0]);
+        }
+
+        private void withActors(java.util.List<Player> playerActors, java.util.List<NPC> npcActors)
+        {
+            IndexedObjectSet<Player> players = mock(IndexedObjectSet.class);
+            when(players.iterator()).thenAnswer(ignored -> playerActors.iterator());
+            IndexedObjectSet<NPC> npcs = mock(IndexedObjectSet.class);
+            when(npcs.iterator()).thenAnswer(ignored -> npcActors.iterator());
+            doReturn(players).when(worldView).players();
+            doReturn(npcs).when(worldView).npcs();
+        }
     }
 }

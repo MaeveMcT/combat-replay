@@ -28,7 +28,7 @@ When paired and upload is enabled, newly saved recordings are gzip-compressed an
 
 ## Limits
 
-This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source; melee attribution therefore requires later encounter-specific interpretation. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
+This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source. The recorder conservatively emits inferred kill-attribution events when a terminal hitsplat is marked as the local player's damage or has exactly one recently observed projectile source; ambiguous, melee-only, poison/recoil, and stale evidence remains unattributed. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
 
 A future group-content phase may support merging cooperative recordings from multiple consenting clients. Format v1 captures synchronization evidence for that future work, but does not claim a globally authoritative server tick.
 

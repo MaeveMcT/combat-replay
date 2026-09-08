@@ -39,8 +39,10 @@ final class CombatRecorder
 	private final List<ContainerSnapshot> pendingContainerChanges = new ArrayList<>();
 	private final Map<String, String> recordedTiles = new HashMap<>();
 	private final Set<String> previousPrayers = new HashSet<>();
+	private final KillAttributionTracker killAttribution = new KillAttributionTracker();
 	private CombatRecording recording;
 	private int nextActorId;
+	private int nextEventId;
 	private int previousHitpoints = -1;
 	private int previousPrayer = -1;
 	private long recordingStartedNanos;
@@ -65,7 +67,9 @@ final class CombatRecorder
 		pendingContainerChanges.clear();
 		recordedTiles.clear();
 		previousPrayers.clear();
+		killAttribution.reset();
 		nextActorId = 1;
+		nextEventId = 1;
 		previousHitpoints = -1;
 		previousPrayer = -1;
 	}
@@ -84,6 +88,7 @@ final class CombatRecorder
 		recording = null;
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
+		killAttribution.reset();
 		return result;
 	}
 
@@ -104,9 +109,23 @@ final class CombatRecorder
 		{
 			return;
 		}
-		pendingEvents.add(new RecordedEvent(type, client.getGameCycle(), keyFor(actor), keyFor(target),
-			id, value, location == null ? -1 : location.getSceneX(),
-			location == null ? -1 : location.getSceneY(), detail));
+		RecordedEvent observed = observedEvent(type, keyFor(actor), keyFor(target), id, value,
+			location == null ? -1 : location.getSceneX(),
+			location == null ? -1 : location.getSceneY(), detail);
+		pendingEvents.add(observed);
+		killAttribution.observe(observed);
+		if ("DEATH".equals(type))
+		{
+			KillAttributionTracker.Attribution attribution = killAttribution.attribute(observed,
+				keyFor(client.getLocalPlayer()));
+			if (attribution != null)
+			{
+				pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "KILL_ATTRIBUTION",
+					observed.gameCycle, null, attribution.killerKey, observed.actorKey,
+					null, null, null, null, -1, -1, null, null, "inferred",
+					attribution.ruleId, attribution.evidenceEventIds));
+			}
+		}
 	}
 
 	void captureContainerChange(int containerId, ItemContainer container)
@@ -178,12 +197,22 @@ final class CombatRecorder
 		pendingContainerChanges.clear();
 	}
 
+	private RecordedEvent observedEvent(String type, String actorKey, String targetKey,
+		int id, int value, int sceneX, int sceneY, String detail)
+	{
+		return new RecordedEvent("event-" + nextEventId++, type, client.getGameCycle(), null,
+			actorKey, targetKey, RecordedEvent.usesDefinitionId(type) && id >= 0 ? id : null,
+			RecordedEvent.usesAmount(type) ? value : null, null, null, sceneX, sceneY,
+			sceneX < 0 || sceneY < 0 ? null : "scene", detail, "observed", null,
+			java.util.Collections.emptyList());
+	}
+
 	private void recordResourceChange(String resource, int current, int previous)
 	{
 		if (previous >= 0 && current != previous)
 		{
-			pendingEvents.add(new RecordedEvent("RESOURCE_CHANGE", client.getGameCycle(),
-				keyFor(client.getLocalPlayer()), null, 0, current - previous, -1, -1, resource));
+			pendingEvents.add(observedEvent("RESOURCE_CHANGE", keyFor(client.getLocalPlayer()),
+				null, 0, current - previous, -1, -1, resource));
 		}
 	}
 
@@ -199,25 +228,38 @@ final class CombatRecorder
 				active.add(prayer.name());
 			}
 		}
+		// RuneLite reports each upgraded prayer together with the prayer it replaces.
+		suppressReplacedPrayer(current, active, Prayer.DEADEYE, Prayer.EAGLE_EYE);
+		suppressReplacedPrayer(current, active, Prayer.MYSTIC_VIGOUR, Prayer.MYSTIC_MIGHT);
 		for (String prayer : current)
 		{
 			if (!previousPrayers.contains(prayer))
 			{
-				pendingEvents.add(new RecordedEvent("PRAYER_CHANGE", client.getGameCycle(),
-					keyFor(client.getLocalPlayer()), null, 0, 1, -1, -1, prayer));
+				pendingEvents.add(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
+					null, 0, 1, -1, -1, prayer));
 			}
 		}
 		for (String prayer : previousPrayers)
 		{
 			if (!current.contains(prayer))
 			{
-				pendingEvents.add(new RecordedEvent("PRAYER_CHANGE", client.getGameCycle(),
-					keyFor(client.getLocalPlayer()), null, 0, 0, -1, -1, prayer));
+				pendingEvents.add(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
+					null, 0, 0, -1, -1, prayer));
 			}
 		}
 		previousPrayers.clear();
 		previousPrayers.addAll(current);
 		return active;
+	}
+
+	private static void suppressReplacedPrayer(Set<String> current, List<String> active,
+		Prayer upgrade, Prayer replaced)
+	{
+		if (current.contains(upgrade.name()))
+		{
+			current.remove(replaced.name());
+			active.remove(replaced.name());
+		}
 	}
 
 	private List<SceneTileSnapshot> captureScene(WorldView worldView)
