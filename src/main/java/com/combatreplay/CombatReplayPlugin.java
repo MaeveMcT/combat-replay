@@ -17,7 +17,12 @@ import org.slf4j.LoggerFactory;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.GameObject;
+import net.runelite.api.GroundObject;
+import net.runelite.api.DecorativeObject;
+import net.runelite.api.WallObject;
 import net.runelite.api.GraphicsObject;
+import net.runelite.api.MenuAction;
 import net.runelite.api.NPC;
 import net.runelite.api.Projectile;
 import net.runelite.api.TileObject;
@@ -35,6 +40,9 @@ import net.runelite.api.events.GroundObjectSpawned;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.InteractingChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.ItemDespawned;
+import net.runelite.api.events.ItemQuantityChanged;
+import net.runelite.api.events.ItemSpawned;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcChanged;
 import net.runelite.api.events.NpcDespawned;
@@ -45,6 +53,7 @@ import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.events.WallObjectDespawned;
 import net.runelite.api.events.WallObjectSpawned;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.RuneLiteProperties;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -296,22 +305,94 @@ public class CombatReplayPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onItemSpawned(ItemSpawned event)
+	{
+		recorder.upsertGroundItem(event.getTile(), event.getItem(), event.getItem().getQuantity());
+	}
+
+	@Subscribe
+	public void onItemQuantityChanged(ItemQuantityChanged event)
+	{
+		recorder.upsertGroundItem(event.getTile(), event.getItem(), event.getNewQuantity());
+	}
+
+	@Subscribe
+	public void onItemDespawned(ItemDespawned event)
+	{
+		recorder.removeGroundItem(event.getItem());
+	}
+
+	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		if (!recorder.isRecording())
+		if (!recorder.isRecording()) return;
+		String option = sanitized(event.getMenuOption());
+		String targetText = sanitized(event.getMenuTarget());
+		MenuAction action = event.getMenuAction();
+		Actor targetActor = event.getMenuEntry().getNpc() != null
+			? event.getMenuEntry().getNpc() : event.getMenuEntry().getPlayer();
+		String kind = null;
+		Integer itemId = null, widgetId = null, objectId = null;
+		LocalPoint location = null;
+		boolean objectAction = action == MenuAction.ITEM_USE_ON_GAME_OBJECT
+			|| action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT;
+		boolean actorItemAction = action == MenuAction.ITEM_USE_ON_NPC
+			|| action == MenuAction.ITEM_USE_ON_PLAYER;
+		boolean actorSpellAction = action == MenuAction.WIDGET_TARGET_ON_NPC
+			|| action == MenuAction.WIDGET_TARGET_ON_PLAYER;
+		if ("Attack".equalsIgnoreCase(option) && targetActor != null) kind = "attack_actor";
+		else if (actorSpellAction && "Cast".equalsIgnoreCase(option)) kind = "cast_on_actor";
+		else if (action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && "Cast".equalsIgnoreCase(option)) kind = "cast_on_object";
+		else if (action == MenuAction.WIDGET_TARGET_ON_GROUND_ITEM && "Cast".equalsIgnoreCase(option)) kind = "cast_on_ground_item";
+		else if (actorItemAction) kind = "use_item_on_actor";
+		else if (action == MenuAction.ITEM_USE_ON_GAME_OBJECT) kind = "use_item_on_object";
+		else if ("Take".equalsIgnoreCase(option) && isGroundItemAction(action))
 		{
-			return;
+			kind = "take_ground_item";
+			itemId = event.getId();
 		}
-		String option = event.getMenuOption();
-		boolean groundItemAction = "Take".equalsIgnoreCase(option);
-		if ((event.isItemOp() && event.getItemId() >= 0) || groundItemAction)
+		else if (event.isItemOp() && isCombatItemOption(option))
 		{
-			String target = Text.removeTags(event.getMenuTarget());
-			String detail = option + (target.isEmpty() ? "" : " " + target);
-			int itemId = event.getItemId() >= 0 ? event.getItemId() : event.getId();
-			recorder.addEvent("ITEM_ACTION", client.getLocalPlayer(), null, itemId,
-				event.getParam0(), null, detail);
+			kind = isEquipOption(option) ? "equip_item" : "use_inventory_item";
+			itemId = event.getItemId();
 		}
+		if (kind == null) return;
+		if (objectAction)
+		{
+			objectId = event.getId();
+			location = LocalPoint.fromScene(event.getParam0(), event.getParam1());
+		}
+		else if (kind.endsWith("ground_item"))
+		{
+			location = LocalPoint.fromScene(event.getParam0(), event.getParam1());
+		}
+		if (event.getMenuEntry().getWidget() != null) widgetId = event.getMenuEntry().getWidget().getId();
+		recorder.addActionAttempt(kind, targetActor, option, targetText, action.name(),
+			itemId, widgetId, objectId, location);
+	}
+
+	private static boolean isGroundItemAction(MenuAction action)
+	{
+		return action == MenuAction.GROUND_ITEM_FIRST_OPTION || action == MenuAction.GROUND_ITEM_SECOND_OPTION
+			|| action == MenuAction.GROUND_ITEM_THIRD_OPTION || action == MenuAction.GROUND_ITEM_FOURTH_OPTION
+			|| action == MenuAction.GROUND_ITEM_FIFTH_OPTION;
+	}
+
+	private static boolean isCombatItemOption(String option)
+	{
+		return isEquipOption(option) || "Eat".equalsIgnoreCase(option) || "Drink".equalsIgnoreCase(option);
+	}
+
+	private static boolean isEquipOption(String option)
+	{
+		return "Wield".equalsIgnoreCase(option) || "Wear".equalsIgnoreCase(option)
+			|| "Equip".equalsIgnoreCase(option);
+	}
+
+	private static String sanitized(String text)
+	{
+		String value = Text.removeTags(text == null ? "" : text).trim();
+		return value.length() <= 300 ? value : value.substring(0, 300);
 	}
 
 	@Subscribe
@@ -455,8 +536,30 @@ public class CombatReplayPlugin extends Plugin
 
 	private void recordObject(String type, TileObject object)
 	{
-		recorder.captureObjectDefinition(object.getId());
-		recorder.addEvent(type, null, null, object.getId(), object.getPlane(),
-			object.getLocalLocation(), null);
+		String category;
+		Integer orientation = null, configuration = null;
+		if (object instanceof GameObject)
+		{
+			category = "game_object";
+			orientation = ((GameObject) object).getOrientation();
+			configuration = ((GameObject) object).getConfig();
+		}
+		else if (object instanceof WallObject)
+		{
+			category = "wall";
+			orientation = ((WallObject) object).getOrientationA();
+			configuration = ((WallObject) object).getConfig();
+		}
+		else if (object instanceof GroundObject)
+		{
+			category = "ground";
+			configuration = ((GroundObject) object).getConfig();
+		}
+		else
+		{
+			category = "decorative";
+			if (object instanceof DecorativeObject) configuration = ((DecorativeObject) object).getConfig();
+		}
+		recorder.captureObjectEvent(type, object, category, orientation, configuration);
 	}
 }

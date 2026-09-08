@@ -234,6 +234,9 @@
         },
         "projectiles": {
           "$ref": "#/$defs/projectileOperations"
+        },
+        "ground_items": {
+          "$ref": "#/$defs/groundItemOperations"
         }
       }
     },
@@ -838,6 +841,92 @@
             "null"
           ],
           "maxLength": 100
+        },
+        "action_kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "attack_actor",
+            "cast_on_actor",
+            "cast_on_object",
+            "cast_on_ground_item",
+            "use_item_on_actor",
+            "use_item_on_object",
+            "equip_item",
+            "use_inventory_item",
+            "take_ground_item",
+            null
+          ]
+        },
+        "menu_option": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "menu_target": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "menu_action": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "item_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "widget_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "object_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "object_category": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "wall",
+            "ground",
+            "decorative",
+            "game_object",
+            null
+          ]
+        },
+        "effective_definition_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "object_orientation": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "object_configuration": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "size_x": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 64
+        },
+        "size_y": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 64
         }
       }
     },
@@ -1180,6 +1269,80 @@
         },
         "run": {
           "$ref": "#/$defs/nullableInteger"
+        }
+      }
+    },
+    "groundItemOperations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upsert",
+        "remove"
+      ],
+      "properties": {
+        "upsert": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/groundItem"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "groundItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "item_id",
+        "quantity",
+        "view_key",
+        "plane",
+        "x",
+        "y",
+        "observed_cycle"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "item_id": {
+          "type": "integer"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "view_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plane": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        },
+        "observed_cycle": {
+          "type": "integer"
         }
       }
     }

@@ -87,10 +87,14 @@ public class ReplayV1FormatTest
         RecordedEvent transform = new RecordedEvent("event-1", "NPC_CHANGED", 100, null,
             "player-1", null, 9036, null, 9037, 9036, null, null, null, -1, -1, null,
             null, "observed", null, Collections.emptyList());
+        RecordedEvent attempt = new RecordedEvent("event-2", "ACTION_ATTEMPT", 100, null,
+            "player-1", null, null, null, null, null, null, null, null, -1, -1, null,
+            null, "observed", null, Collections.emptyList(), "equip_item", "Wield",
+            "Abyssal whip", "ITEM_SECOND_OPTION", 4151, 9764864, null, null);
         recording.add(new RecordedTick(0, 100, 3200, 3200, false,
             90, 99, 70, 70, Collections.singletonList(player("player-1", "Alice", true)),
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
-            Collections.singletonList(transform)));
+            java.util.Arrays.asList(transform, attempt)));
 
         JsonObject encoded = ReplayV1Format.encode(recording.completed(1_600L));
         CombatRecording decoded = ReplayV1Format.decode(encoded);
@@ -100,6 +104,8 @@ public class ReplayV1FormatTest
         assertEquals(Integer.valueOf(36049), decoded.objectDefinitions.get(36048).effectiveDefinitionId);
         assertEquals(Integer.valueOf(9037), decoded.ticks.get(0).events.get(0).fromDefinitionId);
         assertEquals(Integer.valueOf(9036), decoded.ticks.get(0).events.get(0).toDefinitionId);
+        assertEquals("equip_item", decoded.ticks.get(0).events.get(1).actionKind);
+        assertEquals(Integer.valueOf(4151), decoded.ticks.get(0).events.get(1).itemId);
         assertTrue(encoded.getAsJsonObject("capture").getAsJsonArray("capabilities")
             .contains(new com.google.gson.JsonPrimitive("npc_definitions")));
     }
@@ -123,6 +129,7 @@ public class ReplayV1FormatTest
         assertEquals(116, recording.ticks.get(2).combatState.strengthCurrent);
         assertEquals(6100, recording.ticks.get(2).combatState.runEnergyHundredths);
         Map<String, ProjectileSnapshot> state = new LinkedHashMap<>();
+        Map<String, GroundItemSnapshot> groundState = new LinkedHashMap<>();
         int[] expectedCounts = {1, 1, 0};
         for (int index = 0; index < recording.ticks.size(); index++)
         {
@@ -130,6 +137,9 @@ public class ReplayV1FormatTest
             for (String key : tick.projectileRemovals) state.remove(key);
             for (ProjectileSnapshot projectile : tick.projectileUpserts) state.put(projectile.key, projectile);
             assertEquals(expectedCounts[index], state.size());
+            for (String key : tick.groundItemRemovals) groundState.remove(key);
+            for (GroundItemSnapshot item : tick.groundItemUpserts) groundState.put(item.key, item);
+            assertEquals(expectedCounts[index], groundState.size());
         }
     }
 

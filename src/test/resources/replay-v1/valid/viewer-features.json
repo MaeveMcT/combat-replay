@@ -29,13 +29,16 @@
       "object_definitions",
       "projectile_lifecycle",
       "local_combat_stats",
-      "actor_movement_animations"
+      "actor_movement_animations",
+      "ground_items",
+      "action_attempts"
     ]
   },
   "dictionaries": {
     "items": {
       "385": "Shark",
-      "4151": "Abyssal whip"
+      "4151": "Abyssal whip",
+      "23866": "Crystal shard"
     },
     "npcs": {
       "9037": {
@@ -313,6 +316,21 @@
           }
         ],
         "remove": []
+      },
+      "ground_items": {
+        "upsert": [
+          {
+            "key": "ground-item-1",
+            "item_id": 23866,
+            "quantity": 3,
+            "view_key": "view-main",
+            "plane": 0,
+            "x": 3211,
+            "y": 3210,
+            "observed_cycle": 100
+          }
+        ],
+        "remove": []
       }
     },
     {
@@ -451,7 +469,13 @@
           "detail": null,
           "evidence": "observed",
           "rule_id": null,
-          "evidence_event_ids": []
+          "evidence_event_ids": [],
+          "object_category": "ground",
+          "effective_definition_id": 36048,
+          "object_orientation": null,
+          "object_configuration": 10,
+          "size_x": 1,
+          "size_y": 1
         },
         {
           "event_id": "floor-on",
@@ -472,11 +496,32 @@
           "detail": null,
           "evidence": "observed",
           "rule_id": null,
-          "evidence_event_ids": []
+          "evidence_event_ids": [],
+          "object_category": "game_object",
+          "effective_definition_id": 36049,
+          "object_orientation": 512,
+          "object_configuration": 10,
+          "size_x": 2,
+          "size_y": 1
         }
       ],
       "projectiles": {
         "upsert": [],
+        "remove": []
+      },
+      "ground_items": {
+        "upsert": [
+          {
+            "key": "ground-item-1",
+            "item_id": 23866,
+            "quantity": 5,
+            "view_key": "view-main",
+            "plane": 0,
+            "x": 3211,
+            "y": 3210,
+            "observed_cycle": 130
+          }
+        ],
         "remove": []
       }
     },
@@ -557,6 +602,12 @@
         "upsert": [],
         "remove": [
           "projectile-1"
+        ]
+      },
+      "ground_items": {
+        "upsert": [],
+        "remove": [
+          "ground-item-1"
         ]
       }
     }

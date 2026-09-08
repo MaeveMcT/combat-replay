@@ -25,6 +25,7 @@ import net.runelite.api.SceneTilePaint;
 import net.runelite.api.Skill;
 import net.runelite.api.Tile;
 import net.runelite.api.TileObject;
+import net.runelite.api.TileItem;
 import net.runelite.api.VarPlayer;
 import net.runelite.api.WorldView;
 import net.runelite.api.gameval.InventoryID;
@@ -45,6 +46,7 @@ final class CombatRecorder
 	private final Set<String> previousPrayers = new HashSet<>();
 	private final KillAttributionTracker killAttribution = new KillAttributionTracker();
 	private final ProjectileTracker projectiles = new ProjectileTracker();
+	private final GroundItemTracker groundItems = new GroundItemTracker();
 	private CombatRecording recording;
 	private int nextActorId;
 	private int nextEventId;
@@ -80,6 +82,7 @@ final class CombatRecorder
 		previousPrayers.clear();
 		killAttribution.reset();
 		projectiles.reset();
+		groundItems.reset();
 		nextActorId = 1;
 		nextEventId = 1;
 		previousHitpoints = -1;
@@ -102,6 +105,7 @@ final class CombatRecorder
 		pendingContainerChanges.clear();
 		killAttribution.reset();
 		projectiles.reset();
+		groundItems.reset();
 		return result;
 	}
 
@@ -141,6 +145,19 @@ final class CombatRecorder
 		}
 	}
 
+	void addActionAttempt(String actionKind, Actor target, String option, String menuTarget,
+		String menuAction, Integer itemId, Integer widgetId, Integer objectId, LocalPoint location)
+	{
+		if (!isRecording()) return;
+		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "ACTION_ATTEMPT",
+			client.getGameCycle(), null, keyFor(client.getLocalPlayer()), keyFor(target), null,
+			null, null, null, null, null, null,
+			location == null ? -1 : location.getSceneX(), location == null ? -1 : location.getSceneY(),
+			location == null ? null : "scene", null, "observed", null,
+			java.util.Collections.emptyList(), actionKind, option, menuTarget, menuAction,
+			itemId, widgetId, objectId, null));
+	}
+
 	void captureProjectile(Projectile projectile, LocalPoint movedTo)
 	{
 		if (!isRecording() || projectile == null) return;
@@ -160,6 +177,22 @@ final class CombatRecorder
 		killAttribution.observe(event);
 	}
 
+	void upsertGroundItem(Tile tile, TileItem item, int quantity)
+	{
+		if (!isRecording() || tile == null || item == null || quantity <= 0) return;
+		WorldPoint point = tile.getWorldLocation();
+		WorldView view = client.getTopLevelWorldView();
+		if (point == null || view == null) return;
+		String name = availableName(client.getItemDefinition(item.getId()).getName());
+		groundItems.upsert(item, item.getId(), name, quantity, "view-" + viewIdentity(view),
+			point.getPlane(), point.getX(), point.getY(), client.getGameCycle());
+	}
+
+	void removeGroundItem(TileItem item)
+	{
+		if (isRecording() && item != null) groundItems.remove(item);
+	}
+
 	void captureNpcTransform(NPC npc, NPCComposition oldComposition)
 	{
 		if (!isRecording() || npc == null) return;
@@ -174,6 +207,24 @@ final class CombatRecorder
 			null, null, null, location == null ? -1 : location.getSceneX(),
 			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
 			null, "observed", null, java.util.Collections.emptyList()));
+	}
+
+	void captureObjectEvent(String type, TileObject object, String category,
+		Integer orientation, Integer configuration)
+	{
+		if (!isRecording() || object == null) return;
+		captureObjectDefinition(object.getId());
+		ObjectDefinitionMetadata metadata = recording.objectDefinitions.get(object.getId());
+		LocalPoint location = object.getLocalLocation();
+		ObjectObservation observation = new ObjectObservation(category,
+			metadata == null ? null : metadata.effectiveDefinitionId, orientation, configuration,
+			metadata == null ? null : metadata.sizeX, metadata == null ? null : metadata.sizeY);
+		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, type, client.getGameCycle(),
+			null, null, null, object.getId(), null, null, null, null, null,
+			object.getPlane(), location == null ? -1 : location.getSceneX(),
+			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
+			null, "observed", null, java.util.Collections.emptyList(), null, null, null,
+			null, null, null, null, observation));
 	}
 
 	void captureObjectDefinition(int definitionId)
@@ -241,6 +292,7 @@ final class CombatRecorder
 		ProjectileTracker.Delta projectileDelta = projectiles.drain(client.getGameCycle(),
 			"view-" + viewIdentity);
 		LocalCombatState combatState = captureCombatState();
+		GroundItemTracker.Delta groundItemDelta = groundItems.drain();
 		recording.add(new RecordedTick(recording.ticks.size(), client.getGameCycle(),
 			client.getTickCount(), observedAt, elapsedMillis, world > 0 ? world : null,
 			"view-" + viewIdentity,
@@ -251,7 +303,8 @@ final class CombatRecorder
 			snapshotItems(client.getItemContainer(InventoryID.INV)),
 			snapshotItems(client.getItemContainer(InventoryID.WORN)),
 			pendingContainerChanges, pendingEvents, captureScene(worldView), Collections.emptyList(),
-			activePrayers, projectileDelta.upserts, projectileDelta.removals, combatState));
+			activePrayers, projectileDelta.upserts, projectileDelta.removals, combatState,
+			groundItemDelta.upserts, groundItemDelta.removals));
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
 	}
@@ -419,7 +472,7 @@ final class CombatRecorder
 			Item item = items[slot];
 			if (item.getId() >= 0 && item.getQuantity() > 0)
 			{
-				String name = client.getItemDefinition(item.getId()).getName();
+				String name = availableName(client.getItemDefinition(item.getId()).getName());
 				snapshots.add(new ItemSnapshot(slot, item.getId(), item.getQuantity(), name));
 			}
 		}
@@ -483,6 +536,11 @@ final class CombatRecorder
 		}
 	}
 
+	private static String availableName(String name)
+	{
+		return name == null || name.trim().isEmpty() || "null".equalsIgnoreCase(name.trim()) ? null : name;
+	}
+
 	private List<ItemSnapshot> snapshotVisibleEquipment(Player player)
 	{
 		List<ItemSnapshot> equipment = new ArrayList<>();
@@ -496,7 +554,7 @@ final class CombatRecorder
 			if (itemId >= 0)
 			{
 				equipment.add(new ItemSnapshot(slot.getIndex(), itemId, 1,
-					client.getItemDefinition(itemId).getName()));
+					availableName(client.getItemDefinition(itemId).getName())));
 			}
 		}
 		return equipment;

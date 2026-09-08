@@ -26,6 +26,11 @@ final class ReplayV1SemanticValidator
 		String localKey = nullableString(capture.get("local_actor_key"));
 		Set<String> capabilities = strings(capture.getAsJsonArray("capabilities"));
 		Map<String, Boolean> actors = new HashMap<>();
+		JsonObject dictionaries = root.getAsJsonObject("dictionaries");
+		if (dictionaries.has("npcs")) require(capabilities.contains("npc_definitions"),
+			"NPC definitions lack a capability");
+		if (dictionaries.has("objects")) require(capabilities.contains("object_definitions"),
+			"Object definitions lack a capability");
 		Set<String> eventIds = new HashSet<>();
 		Set<String> evidenceReferences = new HashSet<>();
 		long previousElapsed = -1L;
@@ -104,9 +109,15 @@ final class ReplayV1SemanticValidator
 				capabilityForPresent(localState, "inventory", "inventory", capabilities);
 				capabilityForPresent(localState, "equipment", "equipment", capabilities);
 				capabilityForPresent(localState, "active_prayers", "active_prayers", capabilities);
+				capabilityForPresent(localState, "combat_stats", "local_combat_stats", capabilities);
+				capabilityForPresent(localState, "run_energy", "local_combat_stats", capabilities);
+				capabilityForPresent(localState, "special_attack_energy", "local_combat_stats", capabilities);
+				capabilityForPresent(localState, "special_attack_enabled", "local_combat_stats", capabilities);
 			}
 
 			validateScene(tick.getAsJsonObject("scene"), capabilities);
+			validateKeyedOperations(object(tick, "projectiles"), "projectile_lifecycle", capabilities);
+			validateKeyedOperations(object(tick, "ground_items"), "ground_items", capabilities);
 			JsonArray containers = tick.getAsJsonArray("container_changes");
 			if (containers.size() > 0) require(capabilities.contains("container_changes"),
 				"Container changes lack a capability");
@@ -122,6 +133,10 @@ final class ReplayV1SemanticValidator
 			{
 				JsonObject event = element.getAsJsonObject();
 				String eventId = event.get("event_id").getAsString();
+				if (event.has("projectile_key")) require(capabilities.contains("projectile_lifecycle"),
+					"Projectile key lacks a capability");
+				if (event.has("action_kind")) require(capabilities.contains("action_attempts"),
+					"Action attempt lacks a capability");
 				require(eventIds.add(eventId), "Duplicate event ID");
 				for (JsonElement reference : event.getAsJsonArray("evidence_event_ids"))
 					evidenceReferences.add(reference.getAsString());
@@ -141,6 +156,20 @@ final class ReplayV1SemanticValidator
 		for (JsonElement upsert : operations.getAsJsonArray("upsert"))
 			require(keys.add(tileKey(upsert.getAsJsonObject())), "Duplicate tile operation");
 		if (!keys.isEmpty()) require(capabilities.contains("scene_tiles"), "Scene data lacks a capability");
+	}
+
+	private static void validateKeyedOperations(JsonObject operations, String capability,
+		Set<String> capabilities)
+	{
+		if (operations == null) return;
+		Set<String> keys = new HashSet<>();
+		for (JsonElement removed : operations.getAsJsonArray("remove"))
+			require(keys.add(removed.getAsString()), "Duplicate " + capability + " operation");
+		for (JsonElement upsert : operations.getAsJsonArray("upsert"))
+			require(keys.add(upsert.getAsJsonObject().get("key").getAsString()),
+				"Duplicate " + capability + " operation");
+		if (!keys.isEmpty()) require(capabilities.contains(capability),
+			capability + " data lacks a capability");
 	}
 
 	private static Integer monotonic(JsonElement element, Integer previous, String label)

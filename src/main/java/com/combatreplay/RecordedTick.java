@@ -33,6 +33,8 @@ final class RecordedTick
 	final List<ProjectileSnapshot> projectileUpserts;
 	final List<String> projectileRemovals;
 	final LocalCombatState combatState;
+	final List<GroundItemSnapshot> groundItemUpserts;
+	final List<String> groundItemRemovals;
 
 	RecordedTick(int tick, int gameCycle, int baseX, int baseY, boolean instanced,
 		int hitpoints, int maximumHitpoints, int prayer, int maximumPrayer,
@@ -108,6 +110,24 @@ final class RecordedTick
 		List<ProjectileSnapshot> projectileUpserts, List<String> projectileRemovals,
 		LocalCombatState combatState)
 	{
+		this(tick, gameCycle, clientTick, observedAtEpochMillis, elapsedMillis, world, viewKey,
+			instanceTemplateChunks, contextPlane, baseX, baseY, instanced, hitpoints, maximumHitpoints,
+			prayer, maximumPrayer, actors, inventory, equipment, containerChanges, events, sceneTiles,
+			sceneRemovals, activePrayers, projectileUpserts, projectileRemovals, combatState,
+			Collections.emptyList(), Collections.emptyList());
+	}
+
+	RecordedTick(int tick, int gameCycle, int clientTick, long observedAtEpochMillis,
+		long elapsedMillis, Integer world, String viewKey, int[][][] instanceTemplateChunks,
+		int contextPlane, int baseX, int baseY, boolean instanced, int hitpoints, int maximumHitpoints,
+		int prayer, int maximumPrayer, List<ActorSnapshot> actors, List<ItemSnapshot> inventory,
+		List<ItemSnapshot> equipment, List<ContainerSnapshot> containerChanges,
+		List<RecordedEvent> events, List<SceneTileSnapshot> sceneTiles,
+		List<SceneTileKey> sceneRemovals, List<String> activePrayers,
+		List<ProjectileSnapshot> projectileUpserts, List<String> projectileRemovals,
+		LocalCombatState combatState, List<GroundItemSnapshot> groundItemUpserts,
+		List<String> groundItemRemovals)
+	{
 		this.tick = tick;
 		this.gameCycle = gameCycle;
 		this.clientTick = clientTick;
@@ -135,6 +155,8 @@ final class RecordedTick
 		this.projectileUpserts = immutableCopy(projectileUpserts == null ? Collections.emptyList() : projectileUpserts);
 		this.projectileRemovals = immutableCopy(projectileRemovals == null ? Collections.emptyList() : projectileRemovals);
 		this.combatState = combatState;
+		this.groundItemUpserts = immutableCopy(groundItemUpserts == null ? Collections.emptyList() : groundItemUpserts);
+		this.groundItemRemovals = immutableCopy(groundItemRemovals == null ? Collections.emptyList() : groundItemRemovals);
 	}
 
 	RecordedTick withAdditionalObservations(List<ContainerSnapshot> additionalContainers,
@@ -148,7 +170,8 @@ final class RecordedTick
 			world, viewKey, instanceTemplateChunks, contextPlane, baseX, baseY, instanced, hitpoints,
 			maximumHitpoints, prayer, maximumPrayer, actors, inventory, equipment,
 			mergedContainers, mergedEvents, sceneTiles, sceneRemovals, activePrayers,
-			projectileUpserts, projectileRemovals, combatState);
+			projectileUpserts, projectileRemovals, combatState, groundItemUpserts,
+			groundItemRemovals);
 	}
 
 	private static int[][][] copyChunks(int[][][] source)

@@ -59,7 +59,7 @@ final class ReplayV1Format
             "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
             "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
             "npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats",
-            "actor_movement_animations"
+            "actor_movement_animations", "ground_items", "action_attempts"
         })
         {
             capabilities.add(capability);
@@ -82,6 +82,10 @@ final class ReplayV1Format
             for (ContainerSnapshot container : tick.containerChanges)
             {
                 collectNames(names, container.items);
+            }
+            for (GroundItemSnapshot item : tick.groundItemUpserts)
+            {
+                if (item.itemName != null && !item.itemName.isEmpty()) names.putIfAbsent(item.itemId, item.itemName);
             }
         }
         JsonObject items = new JsonObject();
@@ -132,6 +136,7 @@ final class ReplayV1Format
             encoded.add("actors", actors(tick, previousActors));
             encoded.add("scene", scene(tick));
             encoded.add("projectiles", projectiles(tick));
+            encoded.add("ground_items", groundItems(tick));
             encoded.add("container_changes", containers(tick.containerChanges));
             JsonArray events = new JsonArray();
             for (RecordedEvent event : tick.events)
@@ -331,6 +336,30 @@ final class ReplayV1Format
         return operations;
     }
 
+    private static JsonObject groundItems(RecordedTick tick)
+    {
+        JsonObject operations = new JsonObject();
+        JsonArray upsert = new JsonArray();
+        for (GroundItemSnapshot item : tick.groundItemUpserts)
+        {
+            JsonObject value = new JsonObject();
+            value.addProperty("key", item.key);
+            value.addProperty("item_id", item.itemId);
+            value.addProperty("quantity", item.quantity);
+            value.addProperty("view_key", item.viewKey);
+            value.addProperty("plane", item.plane);
+            value.addProperty("x", item.x);
+            value.addProperty("y", item.y);
+            value.addProperty("observed_cycle", item.observedCycle);
+            upsert.add(value);
+        }
+        JsonArray remove = new JsonArray();
+        for (String key : tick.groundItemRemovals) remove.add(key);
+        operations.add("upsert", upsert);
+        operations.add("remove", remove);
+        return operations;
+    }
+
     private static JsonObject projectiles(RecordedTick tick)
     {
         JsonObject operations = new JsonObject();
@@ -406,6 +435,25 @@ final class ReplayV1Format
         {
             addNullableInteger(value, "from_definition_id", event.fromDefinitionId);
             addNullableInteger(value, "to_definition_id", event.toDefinitionId);
+        }
+        if (event.actionKind != null || "ACTION_ATTEMPT".equals(event.type))
+        {
+            addNullable(value, "action_kind", event.actionKind);
+            addNullable(value, "menu_option", event.menuOption);
+            addNullable(value, "menu_target", event.menuTarget);
+            addNullable(value, "menu_action", event.menuAction);
+            addNullableInteger(value, "item_id", event.itemId);
+            addNullableInteger(value, "widget_id", event.widgetId);
+            addNullableInteger(value, "object_id", event.objectId);
+        }
+        if (event.objectObservation != null)
+        {
+            addNullable(value, "object_category", event.objectObservation.category);
+            addNullableInteger(value, "effective_definition_id", event.objectObservation.effectiveDefinitionId);
+            addNullableInteger(value, "object_orientation", event.objectObservation.orientation);
+            addNullableInteger(value, "object_configuration", event.objectObservation.configuration);
+            addNullableInteger(value, "size_x", event.objectObservation.sizeX);
+            addNullableInteger(value, "size_y", event.objectObservation.sizeY);
         }
         if (event.sceneX < 0 || event.sceneY < 0)
         {
@@ -522,6 +570,7 @@ final class ReplayV1Format
         Map<String, ActorSnapshot> actors = new LinkedHashMap<>();
         Map<String, SceneTileSnapshot> scene = new LinkedHashMap<>();
         Map<String, ProjectileSnapshot> projectiles = new LinkedHashMap<>();
+        Map<String, GroundItemSnapshot> groundItems = new LinkedHashMap<>();
         List<RecordedTick> ticks = new java.util.ArrayList<>();
         Integer world = null;
         String viewKey = null;
@@ -616,6 +665,30 @@ final class ReplayV1Format
                     projectiles.put(projectile.key, projectile);
                 }
             }
+            List<String> groundItemRemovals = new java.util.ArrayList<>();
+            List<GroundItemSnapshot> groundItemUpserts = new java.util.ArrayList<>();
+            JsonObject groundItemOperations = object(encoded, "ground_items");
+            if (groundItemOperations != null)
+            {
+                for (com.google.gson.JsonElement removed : groundItemOperations.getAsJsonArray("remove"))
+                {
+                    String key = removed.getAsString();
+                    groundItemRemovals.add(key);
+                    groundItems.remove(key);
+                }
+                for (com.google.gson.JsonElement upsert : groundItemOperations.getAsJsonArray("upsert"))
+                {
+                    JsonObject value = upsert.getAsJsonObject();
+                    int itemId = value.get("item_id").getAsInt();
+                    GroundItemSnapshot item = new GroundItemSnapshot(value.get("key").getAsString(),
+                        itemId, itemNames.get(itemId), value.get("quantity").getAsInt(),
+                        value.get("view_key").getAsString(), value.get("plane").getAsInt(),
+                        value.get("x").getAsInt(), value.get("y").getAsInt(),
+                        value.get("observed_cycle").getAsInt());
+                    groundItemUpserts.add(item);
+                    groundItems.put(item.key, item);
+                }
+            }
             JsonObject sync = encoded.getAsJsonObject("sync");
             List<ContainerSnapshot> containers = decodeContainers(encoded.get("container_changes"), itemNames);
             List<RecordedEvent> events = decodeEvents(encoded.getAsJsonArray("events"));
@@ -626,7 +699,8 @@ final class ReplayV1Format
                 plane, baseX, baseY, instanced, hitpoints, baseHitpoints, prayer, basePrayer,
                 new java.util.ArrayList<>(actors.values()), inventory, equipment, containers, events,
                 new java.util.ArrayList<>(scene.values()), sceneRemovals, activePrayers,
-                projectileUpserts, projectileRemovals, combatState));
+                projectileUpserts, projectileRemovals, combatState,
+                groundItemUpserts, groundItemRemovals));
         }
         JsonObject producer = root.getAsJsonObject("producer");
         return CombatRecording.restored(root.get("recording_id").getAsString(),
@@ -716,6 +790,16 @@ final class ReplayV1Format
             nullableIntValue(value, "decorative_object_id", -1, -1), objects);
     }
 
+    private static ObjectObservation decodeObjectObservation(JsonObject value)
+    {
+        if (!value.has("object_category")) return null;
+        return new ObjectObservation(nullableString(value, "object_category", null),
+            nullableInteger(value, "effective_definition_id", null),
+            nullableInteger(value, "object_orientation", null),
+            nullableInteger(value, "object_configuration", null),
+            nullableInteger(value, "size_x", null), nullableInteger(value, "size_y", null));
+    }
+
     private static LocalCombatState decodeCombatState(JsonObject local, LocalCombatState previous)
     {
         JsonObject stats = local.getAsJsonObject("combat_stats");
@@ -790,7 +874,11 @@ final class ReplayV1Format
                 location == null ? -1 : location.get("y").getAsInt(),
                 location == null ? null : location.get("coordinate_space").getAsString(),
                 nullableString(value, "detail", null), value.get("evidence").getAsString(),
-                nullableString(value, "rule_id", null), strings(value.get("evidence_event_ids"))));
+                nullableString(value, "rule_id", null), strings(value.get("evidence_event_ids")),
+                nullableString(value, "action_kind", null), nullableString(value, "menu_option", null),
+                nullableString(value, "menu_target", null), nullableString(value, "menu_action", null),
+                nullableInteger(value, "item_id", null), nullableInteger(value, "widget_id", null),
+                nullableInteger(value, "object_id", null), decodeObjectObservation(value)));
         }
         return result;
     }

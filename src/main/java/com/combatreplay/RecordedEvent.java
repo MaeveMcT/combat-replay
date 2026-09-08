@@ -26,6 +26,14 @@ final class RecordedEvent
 	final String evidence;
 	final String ruleId;
 	final List<String> evidenceEventIds;
+	final String actionKind;
+	final String menuOption;
+	final String menuTarget;
+	final String menuAction;
+	final Integer itemId;
+	final Integer widgetId;
+	final Integer objectId;
+	final ObjectObservation objectObservation;
 
 	RecordedEvent(String type, int gameCycle, String actorKey, String targetKey,
 		int id, int value, int sceneX, int sceneY, String detail)
@@ -51,6 +59,20 @@ final class RecordedEvent
 		String coordinateSpace, String detail, String evidence, String ruleId,
 		List<String> evidenceEventIds)
 	{
+		this(eventId, type, gameCycle, sequence, actorKey, targetKey, id, value,
+			fromDefinitionId, toDefinitionId, projectileKey, viewKey, plane, sceneX, sceneY,
+			coordinateSpace, detail, evidence, ruleId, evidenceEventIds, null, null, null,
+			null, null, null, null, null);
+	}
+
+	RecordedEvent(String eventId, String type, int gameCycle, Integer sequence,
+		String actorKey, String targetKey, Integer id, Integer value, Integer fromDefinitionId,
+		Integer toDefinitionId, String projectileKey, String viewKey, Integer plane, int sceneX, int sceneY,
+		String coordinateSpace, String detail, String evidence, String ruleId,
+		List<String> evidenceEventIds, String actionKind, String menuOption, String menuTarget,
+		String menuAction, Integer itemId, Integer widgetId, Integer objectId,
+		ObjectObservation objectObservation)
+	{
 		this.eventId = eventId;
 		this.type = type;
 		this.gameCycle = gameCycle;
@@ -71,6 +93,14 @@ final class RecordedEvent
 		this.evidence = evidence;
 		this.ruleId = ruleId;
 		this.evidenceEventIds = Collections.unmodifiableList(new ArrayList<>(evidenceEventIds));
+		this.actionKind = actionKind;
+		this.menuOption = menuOption;
+		this.menuTarget = menuTarget;
+		this.menuAction = menuAction;
+		this.itemId = itemId;
+		this.widgetId = widgetId;
+		this.objectId = objectId;
+		this.objectObservation = objectObservation;
 	}
 
 	static boolean usesDefinitionId(String type)
