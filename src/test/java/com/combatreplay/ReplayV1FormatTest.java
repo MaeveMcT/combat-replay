@@ -115,6 +115,10 @@ public class ReplayV1FormatTest
         }
 
         CombatRecording recording = ReplayV1Format.decode(fixture);
+        assertEquals(117, recording.ticks.get(0).combatState.strengthCurrent);
+        assertEquals(116, recording.ticks.get(1).combatState.strengthCurrent);
+        assertEquals(116, recording.ticks.get(2).combatState.strengthCurrent);
+        assertEquals(6100, recording.ticks.get(2).combatState.runEnergyHundredths);
         Map<String, ProjectileSnapshot> state = new LinkedHashMap<>();
         int[] expectedCounts = {1, 1, 0};
         for (int index = 0; index < recording.ticks.size(); index++)

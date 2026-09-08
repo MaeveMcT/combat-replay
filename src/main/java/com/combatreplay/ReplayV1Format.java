@@ -58,7 +58,7 @@ final class ReplayV1Format
         for (String capability : new String[]{
             "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
             "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
-            "npc_definitions", "object_definitions", "projectile_lifecycle"
+            "npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats"
         })
         {
             capabilities.add(capability);
@@ -118,6 +118,7 @@ final class ReplayV1Format
         JsonArray result = new JsonArray();
         Map<String, ActorSnapshot> previousActors = new LinkedHashMap<>();
         int nextEventId = 1;
+        LocalCombatState previousCombatState = null;
         for (int index = 0; index < recording.ticks.size(); index++)
         {
             RecordedTick tick = recording.ticks.get(index);
@@ -126,7 +127,7 @@ final class ReplayV1Format
             encoded.addProperty("keyframe", index == 0);
             encoded.add("sync", sync(recording, tick, index));
             encoded.add("context", context(tick));
-            encoded.add("local_state", localState(tick));
+            encoded.add("local_state", localState(tick, previousCombatState));
             encoded.add("actors", actors(tick, previousActors));
             encoded.add("scene", scene(tick));
             encoded.add("projectiles", projectiles(tick));
@@ -143,6 +144,7 @@ final class ReplayV1Format
             {
                 previousActors.put(actor.key, actor);
             }
+            previousCombatState = tick.combatState;
         }
         return result;
     }
@@ -182,7 +184,7 @@ final class ReplayV1Format
         return context;
     }
 
-    private static JsonObject localState(RecordedTick tick)
+    private static JsonObject localState(RecordedTick tick, LocalCombatState previousCombatState)
     {
         JsonObject state = new JsonObject();
         addAvailableInteger(state, "hitpoints", tick.hitpoints);
@@ -197,7 +199,28 @@ final class ReplayV1Format
             prayers.add(prayer);
         }
         state.add("active_prayers", prayers);
+        if (tick.combatState != null && !tick.combatState.equals(previousCombatState))
+        {
+            JsonObject stats = new JsonObject();
+            stats.add("attack", skill(tick.combatState.attackCurrent, tick.combatState.attackBase));
+            stats.add("strength", skill(tick.combatState.strengthCurrent, tick.combatState.strengthBase));
+            stats.add("defence", skill(tick.combatState.defenceCurrent, tick.combatState.defenceBase));
+            stats.add("ranged", skill(tick.combatState.rangedCurrent, tick.combatState.rangedBase));
+            stats.add("magic", skill(tick.combatState.magicCurrent, tick.combatState.magicBase));
+            state.add("combat_stats", stats);
+            state.addProperty("run_energy", tick.combatState.runEnergyHundredths);
+            state.addProperty("special_attack_energy", tick.combatState.specialAttackEnergyTenths);
+            state.addProperty("special_attack_enabled", tick.combatState.specialAttackEnabled);
+        }
         return state;
+    }
+
+    private static JsonObject skill(int current, int base)
+    {
+        JsonObject skill = new JsonObject();
+        skill.addProperty("current", current);
+        skill.addProperty("base", base);
+        return skill;
     }
 
     private static JsonObject actors(RecordedTick tick, Map<String, ActorSnapshot> previous)
@@ -493,6 +516,7 @@ final class ReplayV1Format
         int hitpoints = -1, baseHitpoints = -1, prayer = -1, basePrayer = -1;
         List<ItemSnapshot> inventory = null, equipment = null;
         List<String> activePrayers = null;
+        LocalCombatState combatState = null;
         JsonArray encodedTicks = root.getAsJsonArray("ticks");
         for (int index = 0; index < encodedTicks.size(); index++)
         {
@@ -526,6 +550,11 @@ final class ReplayV1Format
                 if (local.has("inventory")) inventory = decodeItems(local.get("inventory"), itemNames);
                 if (local.has("equipment")) equipment = decodeItems(local.get("equipment"), itemNames);
                 if (local.has("active_prayers")) activePrayers = strings(local.get("active_prayers"));
+                if (local.has("combat_stats"))
+                {
+                    if (local.get("combat_stats").isJsonNull()) combatState = null;
+                    else combatState = decodeCombatState(local, combatState);
+                }
             }
             JsonObject actorOperations = encoded.getAsJsonObject("actors");
             for (com.google.gson.JsonElement removed : actorOperations.getAsJsonArray("remove"))
@@ -582,7 +611,7 @@ final class ReplayV1Format
                 plane, baseX, baseY, instanced, hitpoints, baseHitpoints, prayer, basePrayer,
                 new java.util.ArrayList<>(actors.values()), inventory, equipment, containers, events,
                 new java.util.ArrayList<>(scene.values()), sceneRemovals, activePrayers,
-                projectileUpserts, projectileRemovals));
+                projectileUpserts, projectileRemovals, combatState));
         }
         JsonObject producer = root.getAsJsonObject("producer");
         return CombatRecording.restored(root.get("recording_id").getAsString(),
@@ -654,6 +683,25 @@ final class ReplayV1Format
             nullableIntValue(value, "wall_object_id", -1, -1),
             nullableIntValue(value, "ground_object_id", -1, -1),
             nullableIntValue(value, "decorative_object_id", -1, -1), objects);
+    }
+
+    private static LocalCombatState decodeCombatState(JsonObject local, LocalCombatState previous)
+    {
+        JsonObject stats = local.getAsJsonObject("combat_stats");
+        JsonObject attack = stats.getAsJsonObject("attack");
+        JsonObject strength = stats.getAsJsonObject("strength");
+        JsonObject defence = stats.getAsJsonObject("defence");
+        JsonObject ranged = stats.getAsJsonObject("ranged");
+        JsonObject magic = stats.getAsJsonObject("magic");
+        return new LocalCombatState(attack.get("current").getAsInt(), attack.get("base").getAsInt(),
+            strength.get("current").getAsInt(), strength.get("base").getAsInt(),
+            defence.get("current").getAsInt(), defence.get("base").getAsInt(),
+            ranged.get("current").getAsInt(), ranged.get("base").getAsInt(),
+            magic.get("current").getAsInt(), magic.get("base").getAsInt(),
+            nullableIntValue(local, "run_energy", previous == null ? -1 : previous.runEnergyHundredths, -1),
+            nullableIntValue(local, "special_attack_energy", previous == null ? -1 : previous.specialAttackEnergyTenths, -1),
+            nullableBooleanValue(local, "special_attack_enabled",
+                previous != null && previous.specialAttackEnabled, false));
     }
 
     private static ProjectileSnapshot decodeProjectile(JsonObject value)

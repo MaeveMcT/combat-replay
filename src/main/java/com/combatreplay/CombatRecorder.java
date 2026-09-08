@@ -25,6 +25,7 @@ import net.runelite.api.SceneTilePaint;
 import net.runelite.api.Skill;
 import net.runelite.api.Tile;
 import net.runelite.api.TileObject;
+import net.runelite.api.VarPlayer;
 import net.runelite.api.WorldView;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.coords.LocalPoint;
@@ -239,6 +240,7 @@ final class CombatRecorder
 		int viewIdentity = viewIdentity(worldView);
 		ProjectileTracker.Delta projectileDelta = projectiles.drain(client.getGameCycle(),
 			"view-" + viewIdentity);
+		LocalCombatState combatState = captureCombatState();
 		recording.add(new RecordedTick(recording.ticks.size(), client.getGameCycle(),
 			client.getTickCount(), observedAt, elapsedMillis, world > 0 ? world : null,
 			"view-" + viewIdentity,
@@ -249,9 +251,21 @@ final class CombatRecorder
 			snapshotItems(client.getItemContainer(InventoryID.INV)),
 			snapshotItems(client.getItemContainer(InventoryID.WORN)),
 			pendingContainerChanges, pendingEvents, captureScene(worldView), Collections.emptyList(),
-			activePrayers, projectileDelta.upserts, projectileDelta.removals));
+			activePrayers, projectileDelta.upserts, projectileDelta.removals, combatState));
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
+	}
+
+	private LocalCombatState captureCombatState()
+	{
+		return new LocalCombatState(
+			client.getBoostedSkillLevel(Skill.ATTACK), client.getRealSkillLevel(Skill.ATTACK),
+			client.getBoostedSkillLevel(Skill.STRENGTH), client.getRealSkillLevel(Skill.STRENGTH),
+			client.getBoostedSkillLevel(Skill.DEFENCE), client.getRealSkillLevel(Skill.DEFENCE),
+			client.getBoostedSkillLevel(Skill.RANGED), client.getRealSkillLevel(Skill.RANGED),
+			client.getBoostedSkillLevel(Skill.MAGIC), client.getRealSkillLevel(Skill.MAGIC),
+			client.getEnergy(), client.getVarpValue(VarPlayer.SPECIAL_ATTACK_PERCENT),
+			client.getVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED) == 1);
 	}
 
 	private RecordedEvent observedEvent(String type, String actorKey, String targetKey,

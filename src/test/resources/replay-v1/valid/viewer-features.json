@@ -27,7 +27,8 @@
       "event_confidence",
       "npc_definitions",
       "object_definitions",
-      "projectile_lifecycle"
+      "projectile_lifecycle",
+      "local_combat_stats"
     ]
   },
   "dictionaries": {
@@ -107,7 +108,32 @@
         "active_prayers": [
           "PROTECT_FROM_MELEE",
           "PIETY"
-        ]
+        ],
+        "combat_stats": {
+          "attack": {
+            "current": 118,
+            "base": 99
+          },
+          "strength": {
+            "current": 117,
+            "base": 99
+          },
+          "defence": {
+            "current": 99,
+            "base": 99
+          },
+          "ranged": {
+            "current": 112,
+            "base": 99
+          },
+          "magic": {
+            "current": 99,
+            "base": 99
+          }
+        },
+        "run_energy": 6300,
+        "special_attack_energy": 500,
+        "special_attack_enabled": false
       },
       "actors": {
         "upsert": [
@@ -297,7 +323,32 @@
             "item_id": 385,
             "quantity": 1
           }
-        ]
+        ],
+        "combat_stats": {
+          "attack": {
+            "current": 118,
+            "base": 99
+          },
+          "strength": {
+            "current": 116,
+            "base": 99
+          },
+          "defence": {
+            "current": 99,
+            "base": 99
+          },
+          "ranged": {
+            "current": 112,
+            "base": 99
+          },
+          "magic": {
+            "current": 99,
+            "base": 99
+          }
+        },
+        "run_energy": 6100,
+        "special_attack_energy": 250,
+        "special_attack_enabled": true
       },
       "actors": {
         "upsert": [

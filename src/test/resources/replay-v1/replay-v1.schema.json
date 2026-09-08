@@ -365,6 +365,40 @@
             "type": "string",
             "maxLength": 100
           }
+        },
+        "combat_stats": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/combatStats"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_energy": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "Hundredths of one percent, as returned by Client#getEnergy."
+        },
+        "special_attack_energy": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Tenths of one percent from VarPlayer.SPECIAL_ATTACK_PERCENT."
+        },
+        "special_attack_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     },
@@ -1043,6 +1077,52 @@
         },
         "orientation": {
           "type": "integer"
+        }
+      }
+    },
+    "skillLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current",
+        "base"
+      ],
+      "properties": {
+        "current": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "base": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "combatStats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attack",
+        "strength",
+        "defence",
+        "ranged",
+        "magic"
+      ],
+      "properties": {
+        "attack": {
+          "$ref": "#/$defs/skillLevel"
+        },
+        "strength": {
+          "$ref": "#/$defs/skillLevel"
+        },
+        "defence": {
+          "$ref": "#/$defs/skillLevel"
+        },
+        "ranged": {
+          "$ref": "#/$defs/skillLevel"
+        },
+        "magic": {
+          "$ref": "#/$defs/skillLevel"
         }
       }
     }
