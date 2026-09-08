@@ -20,6 +20,8 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -83,7 +85,7 @@ public class ReplayV1FormatTest
         recording.recordObjectDefinition(36048,
             new ObjectDefinitionMetadata(null, 36049, 2, 1, null, 12));
         RecordedEvent transform = new RecordedEvent("event-1", "NPC_CHANGED", 100, null,
-            "player-1", null, 9036, null, 9037, 9036, null, null, -1, -1, null,
+            "player-1", null, 9036, null, 9037, 9036, null, null, null, -1, -1, null,
             null, "observed", null, Collections.emptyList());
         recording.add(new RecordedTick(0, 100, 3200, 3200, false,
             90, 99, 70, 70, Collections.singletonList(player("player-1", "Alice", true)),
@@ -100,6 +102,28 @@ public class ReplayV1FormatTest
         assertEquals(Integer.valueOf(9036), decoded.ticks.get(0).events.get(0).toDefinitionId);
         assertTrue(encoded.getAsJsonObject("capture").getAsJsonArray("capabilities")
             .contains(new com.google.gson.JsonPrimitive("npc_definitions")));
+    }
+
+    @Test
+    public void decodesDeterministicProjectileLifecycle() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/viewer-features.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+
+        CombatRecording recording = ReplayV1Format.decode(fixture);
+        Map<String, ProjectileSnapshot> state = new LinkedHashMap<>();
+        int[] expectedCounts = {1, 1, 0};
+        for (int index = 0; index < recording.ticks.size(); index++)
+        {
+            RecordedTick tick = recording.ticks.get(index);
+            for (String key : tick.projectileRemovals) state.remove(key);
+            for (ProjectileSnapshot projectile : tick.projectileUpserts) state.put(projectile.key, projectile);
+            assertEquals(expectedCounts[index], state.size());
+        }
     }
 
     @Test
@@ -204,6 +228,9 @@ public class ReplayV1FormatTest
             Set<ValidationMessage> fixtureErrors = schema.validate(mapper.readTree(
                 getClass().getResourceAsStream("/replay-v1/valid/deltas-and-instance.json")));
             assertTrue(fixtureErrors.toString(), fixtureErrors.isEmpty());
+            Set<ValidationMessage> enrichedErrors = schema.validate(mapper.readTree(
+                getClass().getResourceAsStream("/replay-v1/valid/viewer-features.json")));
+            assertTrue(enrichedErrors.toString(), enrichedErrors.isEmpty());
         }
     }
 

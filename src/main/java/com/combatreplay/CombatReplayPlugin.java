@@ -326,8 +326,7 @@ public class CombatReplayPlugin extends Plugin
 	public void onProjectileMoved(ProjectileMoved event)
 	{
 		Projectile projectile = event.getProjectile();
-		recorder.addEvent("PROJECTILE", projectile.getSourceActor(), projectile.getTargetActor(),
-			projectile.getId(), projectile.getEndCycle(), event.getPosition(), null);
+		recorder.captureProjectile(projectile, event.getPosition());
 	}
 
 	@Subscribe

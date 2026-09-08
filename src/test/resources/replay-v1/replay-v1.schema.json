@@ -231,6 +231,9 @@
           "items": {
             "$ref": "#/$defs/event"
           }
+        },
+        "projectiles": {
+          "$ref": "#/$defs/projectileOperations"
         }
       }
     },
@@ -777,6 +780,13 @@
         },
         "to_definition_id": {
           "$ref": "#/$defs/nullableInteger"
+        },
+        "projectile_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
         }
       }
     },
@@ -891,6 +901,148 @@
         },
         "effective_definition_id": {
           "$ref": "#/$defs/nullableInteger"
+        }
+      }
+    },
+    "projectileOperations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upsert",
+        "remove"
+      ],
+      "properties": {
+        "upsert": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/projectile"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "projectilePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "view_key",
+        "plane",
+        "x",
+        "y"
+      ],
+      "properties": {
+        "view_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "plane": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        }
+      }
+    },
+    "projectile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "definition_id",
+        "source_actor_key",
+        "target_actor_key",
+        "source_point",
+        "target_point",
+        "start_cycle",
+        "end_cycle",
+        "remaining_cycles",
+        "start_height",
+        "end_height",
+        "slope",
+        "orientation"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "definition_id": {
+          "type": "integer"
+        },
+        "source_actor_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "target_actor_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "source_point": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/projectilePoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_point": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/projectilePoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start_cycle": {
+          "type": "integer"
+        },
+        "end_cycle": {
+          "type": "integer"
+        },
+        "remaining_cycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_height": {
+          "type": "integer"
+        },
+        "end_height": {
+          "type": "integer"
+        },
+        "slope": {
+          "type": "integer"
+        },
+        "orientation": {
+          "type": "integer"
         }
       }
     }

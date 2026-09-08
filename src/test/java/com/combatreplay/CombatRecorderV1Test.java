@@ -15,6 +15,7 @@ import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.Prayer;
+import net.runelite.api.Projectile;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.WorldView;
@@ -169,6 +170,32 @@ public class CombatRecorderV1Test
         assertEquals(fixture.recorder.keyFor(fixture.local), attribution.targetKey);
         assertEquals("terminal_hitsplat_projectile_v1", attribution.ruleId);
         assertEquals(3, attribution.evidenceEventIds.size());
+    }
+
+    @Test
+    public void linksOneEventToRepeatedProjectileStateUpdates()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
+        Projectile projectile = mock(Projectile.class);
+        when(projectile.getId()).thenReturn(1712);
+        when(projectile.getTargetActor()).thenReturn(fixture.local);
+        when(projectile.getSourcePoint()).thenReturn(new WorldPoint(3215, 3215, 0));
+        when(projectile.getTargetPoint()).thenReturn(new WorldPoint(3210, 3210, 0));
+        when(projectile.getStartCycle()).thenReturn(1200);
+        when(projectile.getEndCycle()).thenReturn(1300);
+        when(projectile.getRemainingCycles()).thenReturn(60, 50);
+
+        fixture.recorder.start();
+        fixture.recorder.captureProjectile(projectile, new LocalPoint(1280, 1280));
+        fixture.recorder.captureProjectile(projectile, new LocalPoint(1408, 1280));
+        fixture.recorder.captureTick();
+        RecordedTick tick = fixture.recorder.stop().ticks.get(0);
+
+        assertEquals(1, tick.projectileUpserts.size());
+        assertEquals(50, tick.projectileUpserts.get(0).remainingCycles);
+        assertEquals(1L, tick.events.stream().filter(event -> "PROJECTILE".equals(event.type)).count());
+        assertEquals(tick.projectileUpserts.get(0).key, tick.events.get(0).projectileKey);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.combatreplay;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -19,6 +20,7 @@ import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.Prayer;
+import net.runelite.api.Projectile;
 import net.runelite.api.SceneTilePaint;
 import net.runelite.api.Skill;
 import net.runelite.api.Tile;
@@ -41,6 +43,7 @@ final class CombatRecorder
 	private final Map<String, String> recordedTiles = new HashMap<>();
 	private final Set<String> previousPrayers = new HashSet<>();
 	private final KillAttributionTracker killAttribution = new KillAttributionTracker();
+	private final ProjectileTracker projectiles = new ProjectileTracker();
 	private CombatRecording recording;
 	private int nextActorId;
 	private int nextEventId;
@@ -75,6 +78,7 @@ final class CombatRecorder
 		recordedTiles.clear();
 		previousPrayers.clear();
 		killAttribution.reset();
+		projectiles.reset();
 		nextActorId = 1;
 		nextEventId = 1;
 		previousHitpoints = -1;
@@ -96,6 +100,7 @@ final class CombatRecorder
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
 		killAttribution.reset();
+		projectiles.reset();
 		return result;
 	}
 
@@ -135,6 +140,25 @@ final class CombatRecorder
 		}
 	}
 
+	void captureProjectile(Projectile projectile, LocalPoint movedTo)
+	{
+		if (!isRecording() || projectile == null) return;
+		WorldView worldView = client.getTopLevelWorldView();
+		String viewKey = worldView == null ? null : "view-" + viewIdentity(worldView);
+		ProjectileTracker.Observation observation = projectiles.observe(projectile, viewKey, this::keyFor);
+		if (!observation.first) return;
+		LocalPoint location = movedTo;
+		RecordedEvent event = new RecordedEvent("event-" + nextEventId++, "PROJECTILE",
+			client.getGameCycle(), null, keyFor(projectile.getSourceActor()),
+			keyFor(projectile.getTargetActor()), projectile.getId(), null, null, null,
+			observation.key, viewKey, worldView == null ? null : worldView.getPlane(),
+			location == null ? -1 : location.getSceneX(), location == null ? -1 : location.getSceneY(),
+			location == null ? null : "scene", null, "observed", null,
+			java.util.Collections.emptyList());
+		pendingEvents.add(event);
+		killAttribution.observe(event);
+	}
+
 	void captureNpcTransform(NPC npc, NPCComposition oldComposition)
 	{
 		if (!isRecording() || npc == null) return;
@@ -146,7 +170,7 @@ final class CombatRecorder
 		LocalPoint location = npc.getLocalLocation();
 		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "NPC_CHANGED",
 			client.getGameCycle(), null, keyFor(npc), null, toId, null, fromId, toId,
-			null, null, location == null ? -1 : location.getSceneX(),
+			null, null, null, location == null ? -1 : location.getSceneX(),
 			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
 			null, "observed", null, java.util.Collections.emptyList()));
 	}
@@ -213,6 +237,8 @@ final class CombatRecorder
 		long elapsedMillis = Math.max(0L, (System.nanoTime() - recordingStartedNanos) / 1_000_000L);
 		int world = client.getWorld();
 		int viewIdentity = viewIdentity(worldView);
+		ProjectileTracker.Delta projectileDelta = projectiles.drain(client.getGameCycle(),
+			"view-" + viewIdentity);
 		recording.add(new RecordedTick(recording.ticks.size(), client.getGameCycle(),
 			client.getTickCount(), observedAt, elapsedMillis, world > 0 ? world : null,
 			"view-" + viewIdentity,
@@ -222,7 +248,8 @@ final class CombatRecorder
 			prayer, client.getRealSkillLevel(Skill.PRAYER), actors,
 			snapshotItems(client.getItemContainer(InventoryID.INV)),
 			snapshotItems(client.getItemContainer(InventoryID.WORN)),
-			pendingContainerChanges, pendingEvents, captureScene(worldView), activePrayers));
+			pendingContainerChanges, pendingEvents, captureScene(worldView), Collections.emptyList(),
+			activePrayers, projectileDelta.upserts, projectileDelta.removals));
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
 	}

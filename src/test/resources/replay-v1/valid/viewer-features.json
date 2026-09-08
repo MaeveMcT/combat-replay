@@ -1,0 +1,468 @@
+{
+  "format_version": 1,
+  "recording_id": "223e4567-e89b-42d3-a456-426614174001",
+  "name": "Viewer feature replay",
+  "started_at": "2026-09-04T12:00:00Z",
+  "ended_at": "2026-09-04T12:00:01.200Z",
+  "producer": {
+    "plugin_name": "Combat Replay",
+    "plugin_version": "1.0.0",
+    "runelite_version": "1.11.0",
+    "java_version": "11",
+    "game_revision": null
+  },
+  "capture": {
+    "nominal_tick_millis": 600,
+    "local_actor_key": "player-1",
+    "initial_world": 330,
+    "capabilities": [
+      "player_names",
+      "actor_local_coordinates",
+      "scene_tiles",
+      "instance_templates",
+      "inventory",
+      "equipment",
+      "active_prayers",
+      "container_changes",
+      "event_confidence",
+      "npc_definitions",
+      "object_definitions",
+      "projectile_lifecycle"
+    ]
+  },
+  "dictionaries": {
+    "items": {
+      "385": "Shark",
+      "4151": "Abyssal whip"
+    },
+    "npcs": {
+      "9037": {
+        "name": "Corrupted Hunllef",
+        "combat_level": 674,
+        "size": 1
+      },
+      "9036": {
+        "name": "Corrupted Hunllef (tornado phase)",
+        "combat_level": 674,
+        "size": 1
+      }
+    },
+    "objects": {
+      "36048": {
+        "name": null,
+        "effective_definition_id": 36048,
+        "size_x": 1,
+        "size_y": 1,
+        "map_icon_id": null,
+        "map_scene_id": null
+      },
+      "36049": {
+        "name": "Crystal gate",
+        "effective_definition_id": 36049,
+        "size_x": 2,
+        "size_y": 1,
+        "map_icon_id": null,
+        "map_scene_id": null
+      }
+    }
+  },
+  "ticks": [
+    {
+      "index": 0,
+      "keyframe": true,
+      "sync": {
+        "game_cycle": 100,
+        "client_tick": 50,
+        "observed_at": "2026-09-04T12:00:00Z",
+        "elapsed_millis": 0
+      },
+      "context": {
+        "world": 330,
+        "view_key": "arena",
+        "plane": 0,
+        "base_x": 3200,
+        "base_y": 3200,
+        "instanced": false,
+        "instance_template_chunks": null
+      },
+      "local_state": {
+        "hitpoints": 70,
+        "base_hitpoints": 99,
+        "prayer": 70,
+        "base_prayer": 77,
+        "inventory": [
+          {
+            "slot": 0,
+            "item_id": 385,
+            "quantity": 2
+          }
+        ],
+        "equipment": [
+          {
+            "slot": 3,
+            "item_id": 4151,
+            "quantity": 1
+          }
+        ],
+        "active_prayers": [
+          "PROTECT_FROM_MELEE",
+          "PIETY"
+        ]
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "player-1",
+            "kind": "player",
+            "display_name": "Alice",
+            "is_local_player": true,
+            "npc_id": null,
+            "view_key": "arena",
+            "world_x": 3210,
+            "world_y": 3210,
+            "scene_x": 10,
+            "scene_y": 10,
+            "local_x": 1344,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 0,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": "player-2",
+            "dead": false,
+            "visible_equipment": [
+              {
+                "slot": 3,
+                "item_id": 4151,
+                "quantity": 1
+              }
+            ],
+            "overhead_icon": null
+          },
+          {
+            "key": "player-2",
+            "kind": "npc",
+            "display_name": "Hunllef",
+            "is_local_player": false,
+            "npc_id": 9037,
+            "view_key": "arena",
+            "world_x": 3215,
+            "world_y": 3215,
+            "scene_x": 15,
+            "scene_y": 15,
+            "local_x": 1472,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 512,
+            "animation_id": 422,
+            "pose_animation_id": 808,
+            "health_ratio": 8,
+            "health_scale": 10,
+            "target_key": "player-1",
+            "dead": false,
+            "visible_equipment": [],
+            "overhead_icon": null
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [
+          {
+            "view_key": "arena",
+            "plane": 0,
+            "x": 3210,
+            "y": 3210,
+            "height": -20,
+            "terrain_rgb": 3358754,
+            "collision_flags": 4,
+            "wall_object_id": null,
+            "ground_object_id": null,
+            "decorative_object_id": null,
+            "game_object_ids": [
+              100
+            ]
+          }
+        ],
+        "remove": []
+      },
+      "container_changes": [
+        {
+          "container": "inventory",
+          "game_cycle": 101,
+          "items": [
+            {
+              "slot": 0,
+              "item_id": 385,
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event_id": "action-eat",
+          "type": "item_action",
+          "game_cycle": 101,
+          "sequence": 0,
+          "actor_key": "player-1",
+          "target_key": null,
+          "definition_id": 385,
+          "amount": null,
+          "location": null,
+          "detail": "Eat Paddlefish",
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        },
+        {
+          "event_id": "heal-hp",
+          "type": "resource_change",
+          "game_cycle": 101,
+          "sequence": 1,
+          "actor_key": "player-1",
+          "target_key": null,
+          "definition_id": null,
+          "amount": 20,
+          "location": null,
+          "detail": "HITPOINTS",
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        }
+      ],
+      "projectiles": {
+        "upsert": [
+          {
+            "key": "projectile-1",
+            "definition_id": 1712,
+            "source_actor_key": "player-2",
+            "target_actor_key": "player-1",
+            "source_point": {
+              "view_key": "view-main",
+              "plane": 0,
+              "x": 3215,
+              "y": 3215
+            },
+            "target_point": {
+              "view_key": "view-main",
+              "plane": 0,
+              "x": 3210,
+              "y": 3210
+            },
+            "start_cycle": 95,
+            "end_cycle": 155,
+            "remaining_cycles": 55,
+            "start_height": 40,
+            "end_height": 0,
+            "slope": 16,
+            "orientation": 1024
+          }
+        ],
+        "remove": []
+      }
+    },
+    {
+      "index": 1,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 130,
+        "client_tick": 51,
+        "observed_at": "2026-09-04T12:00:00.600Z",
+        "elapsed_millis": 600
+      },
+      "context": {
+        "world": 330,
+        "view_key": "arena",
+        "plane": 0,
+        "base_x": 3200,
+        "base_y": 3200,
+        "instanced": true,
+        "instance_template_chunks": [
+          [
+            [
+              12345
+            ]
+          ]
+        ]
+      },
+      "local_state": {
+        "equipment": [
+          {
+            "slot": 3,
+            "item_id": 385,
+            "quantity": 1
+          }
+        ]
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "player-1",
+            "view_key": "arena",
+            "world_x": 3211,
+            "world_y": 3210,
+            "scene_x": 11,
+            "scene_y": 10,
+            "local_x": 1472,
+            "local_y": 1344,
+            "plane": 0,
+            "target_key": "player-2"
+          },
+          {
+            "key": "tornado-1",
+            "kind": "npc",
+            "display_name": "Tornado",
+            "is_local_player": false,
+            "npc_id": 9039,
+            "view_key": "arena",
+            "world_x": 3213,
+            "world_y": 3212,
+            "scene_x": 13,
+            "scene_y": 12,
+            "local_x": 1728,
+            "local_y": 1600,
+            "plane": 0,
+            "size": 1,
+            "orientation": 0,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": null,
+            "dead": false,
+            "visible_equipment": [],
+            "overhead_icon": null
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "floor-off",
+          "type": "object_despawn",
+          "game_cycle": 130,
+          "sequence": 0,
+          "actor_key": null,
+          "target_key": null,
+          "definition_id": 36048,
+          "amount": null,
+          "location": {
+            "view_key": "arena",
+            "plane": 0,
+            "x": 12,
+            "y": 12,
+            "coordinate_space": "scene"
+          },
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        },
+        {
+          "event_id": "floor-on",
+          "type": "object_spawn",
+          "game_cycle": 130,
+          "sequence": 1,
+          "actor_key": null,
+          "target_key": null,
+          "definition_id": 36049,
+          "amount": null,
+          "location": {
+            "view_key": "arena",
+            "plane": 0,
+            "x": 12,
+            "y": 12,
+            "coordinate_space": "scene"
+          },
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        }
+      ],
+      "projectiles": {
+        "upsert": [],
+        "remove": []
+      }
+    },
+    {
+      "index": 2,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 160,
+        "client_tick": 52,
+        "observed_at": "2026-09-04T12:00:01.200Z",
+        "elapsed_millis": 1200
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "player-1",
+            "world_x": 3212,
+            "world_y": 3210,
+            "scene_x": 12,
+            "scene_y": 10,
+            "local_x": 1600,
+            "local_y": 1344
+          },
+          {
+            "key": "tornado-1",
+            "world_x": 3214,
+            "world_y": 3212,
+            "scene_x": 14,
+            "scene_y": 12,
+            "local_x": 1856,
+            "local_y": 1600
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "hunllef-form",
+          "type": "npc_transform",
+          "game_cycle": 160,
+          "sequence": 0,
+          "actor_key": "player-2",
+          "target_key": null,
+          "definition_id": 9036,
+          "amount": null,
+          "location": {
+            "view_key": "arena",
+            "plane": 0,
+            "x": 15,
+            "y": 15,
+            "coordinate_space": "scene"
+          },
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": [],
+          "from_definition_id": 9037,
+          "to_definition_id": 9036
+        }
+      ],
+      "projectiles": {
+        "upsert": [],
+        "remove": [
+          "projectile-1"
+        ]
+      }
+    }
+  ]
+}

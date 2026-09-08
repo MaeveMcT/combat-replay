@@ -58,7 +58,7 @@ final class ReplayV1Format
         for (String capability : new String[]{
             "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
             "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
-            "npc_definitions", "object_definitions"
+            "npc_definitions", "object_definitions", "projectile_lifecycle"
         })
         {
             capabilities.add(capability);
@@ -129,6 +129,7 @@ final class ReplayV1Format
             encoded.add("local_state", localState(tick));
             encoded.add("actors", actors(tick, previousActors));
             encoded.add("scene", scene(tick));
+            encoded.add("projectiles", projectiles(tick));
             encoded.add("container_changes", containers(tick.containerChanges));
             JsonArray events = new JsonArray();
             for (RecordedEvent event : tick.events)
@@ -292,6 +293,49 @@ final class ReplayV1Format
         return operations;
     }
 
+    private static JsonObject projectiles(RecordedTick tick)
+    {
+        JsonObject operations = new JsonObject();
+        JsonArray upsert = new JsonArray();
+        for (ProjectileSnapshot projectile : tick.projectileUpserts)
+        {
+            JsonObject value = new JsonObject();
+            value.addProperty("key", projectile.key);
+            value.addProperty("definition_id", projectile.definitionId);
+            addNullable(value, "source_actor_key", projectile.sourceActorKey);
+            addNullable(value, "target_actor_key", projectile.targetActorKey);
+            value.add("source_point", projectilePoint(projectile.viewKey, projectile.sourcePlane,
+                projectile.sourceX, projectile.sourceY));
+            value.add("target_point", projectilePoint(projectile.viewKey, projectile.targetPlane,
+                projectile.targetX, projectile.targetY));
+            value.addProperty("start_cycle", projectile.startCycle);
+            value.addProperty("end_cycle", projectile.endCycle);
+            value.addProperty("remaining_cycles", projectile.remainingCycles);
+            value.addProperty("start_height", projectile.startHeight);
+            value.addProperty("end_height", projectile.endHeight);
+            value.addProperty("slope", projectile.slope);
+            value.addProperty("orientation", projectile.orientation);
+            upsert.add(value);
+        }
+        JsonArray remove = new JsonArray();
+        for (String key : tick.projectileRemovals) remove.add(key);
+        operations.add("upsert", upsert);
+        operations.add("remove", remove);
+        return operations;
+    }
+
+    private static com.google.gson.JsonElement projectilePoint(String viewKey, Integer plane,
+        Integer x, Integer y)
+    {
+        if (plane == null || x == null || y == null) return JsonNull.INSTANCE;
+        JsonObject point = new JsonObject();
+        addNullable(point, "view_key", viewKey);
+        point.addProperty("plane", plane);
+        point.addProperty("x", x);
+        point.addProperty("y", y);
+        return point;
+    }
+
     private static JsonArray containers(List<ContainerSnapshot> changes)
     {
         JsonArray result = new JsonArray();
@@ -318,6 +362,8 @@ final class ReplayV1Format
         addNullable(value, "target_key", event.targetKey);
         addNullableInteger(value, "definition_id", event.id);
         addNullableInteger(value, "amount", event.value);
+        if (event.projectileKey != null || "PROJECTILE".equals(event.type))
+            addNullable(value, "projectile_key", event.projectileKey);
         if (event.fromDefinitionId != null || event.toDefinitionId != null || "NPC_CHANGED".equals(event.type))
         {
             addNullableInteger(value, "from_definition_id", event.fromDefinitionId);
@@ -437,6 +483,7 @@ final class ReplayV1Format
         Map<Integer, ObjectDefinitionMetadata> objectDefinitions = objectDefinitions(dictionaries);
         Map<String, ActorSnapshot> actors = new LinkedHashMap<>();
         Map<String, SceneTileSnapshot> scene = new LinkedHashMap<>();
+        Map<String, ProjectileSnapshot> projectiles = new LinkedHashMap<>();
         List<RecordedTick> ticks = new java.util.ArrayList<>();
         Integer world = null;
         String viewKey = null;
@@ -507,6 +554,24 @@ final class ReplayV1Format
                 SceneTileSnapshot tile = decodeTile(upsert.getAsJsonObject());
                 scene.put(tile.mapKey(), tile);
             }
+            List<String> projectileRemovals = new java.util.ArrayList<>();
+            List<ProjectileSnapshot> projectileUpserts = new java.util.ArrayList<>();
+            JsonObject projectileOperations = object(encoded, "projectiles");
+            if (projectileOperations != null)
+            {
+                for (com.google.gson.JsonElement removed : projectileOperations.getAsJsonArray("remove"))
+                {
+                    String key = removed.getAsString();
+                    projectileRemovals.add(key);
+                    projectiles.remove(key);
+                }
+                for (com.google.gson.JsonElement upsert : projectileOperations.getAsJsonArray("upsert"))
+                {
+                    ProjectileSnapshot projectile = decodeProjectile(upsert.getAsJsonObject());
+                    projectileUpserts.add(projectile);
+                    projectiles.put(projectile.key, projectile);
+                }
+            }
             JsonObject sync = encoded.getAsJsonObject("sync");
             List<ContainerSnapshot> containers = decodeContainers(encoded.get("container_changes"), itemNames);
             List<RecordedEvent> events = decodeEvents(encoded.getAsJsonArray("events"));
@@ -516,7 +581,8 @@ final class ReplayV1Format
                 sync.get("elapsed_millis").getAsLong(), world, viewKey, templateChunks,
                 plane, baseX, baseY, instanced, hitpoints, baseHitpoints, prayer, basePrayer,
                 new java.util.ArrayList<>(actors.values()), inventory, equipment, containers, events,
-                new java.util.ArrayList<>(scene.values()), sceneRemovals, activePrayers));
+                new java.util.ArrayList<>(scene.values()), sceneRemovals, activePrayers,
+                projectileUpserts, projectileRemovals));
         }
         JsonObject producer = root.getAsJsonObject("producer");
         return CombatRecording.restored(root.get("recording_id").getAsString(),
@@ -590,6 +656,26 @@ final class ReplayV1Format
             nullableIntValue(value, "decorative_object_id", -1, -1), objects);
     }
 
+    private static ProjectileSnapshot decodeProjectile(JsonObject value)
+    {
+        JsonObject source = object(value, "source_point");
+        JsonObject target = object(value, "target_point");
+        return new ProjectileSnapshot(value.get("key").getAsString(), value.get("definition_id").getAsInt(),
+            nullableString(value, "source_actor_key", null), nullableString(value, "target_actor_key", null),
+            source != null ? nullableString(source, "view_key", null)
+                : target != null ? nullableString(target, "view_key", null) : null,
+            source == null ? null : source.get("plane").getAsInt(),
+            source == null ? null : source.get("x").getAsInt(),
+            source == null ? null : source.get("y").getAsInt(),
+            target == null ? null : target.get("plane").getAsInt(),
+            target == null ? null : target.get("x").getAsInt(),
+            target == null ? null : target.get("y").getAsInt(),
+            value.get("start_cycle").getAsInt(), value.get("end_cycle").getAsInt(),
+            value.get("remaining_cycles").getAsInt(), value.get("start_height").getAsInt(),
+            value.get("end_height").getAsInt(), value.get("slope").getAsInt(),
+            value.get("orientation").getAsInt());
+    }
+
     private static List<ContainerSnapshot> decodeContainers(com.google.gson.JsonElement element,
         Map<Integer, String> names)
     {
@@ -618,6 +704,7 @@ final class ReplayV1Format
                 nullableInteger(value, "definition_id", null), nullableInteger(value, "amount", null),
                 nullableInteger(value, "from_definition_id", null),
                 nullableInteger(value, "to_definition_id", null),
+                nullableString(value, "projectile_key", null),
                 location == null ? null : nullableString(location, "view_key", null),
                 location == null ? null : nullableInteger(location, "plane", null),
                 location == null ? -1 : location.get("x").getAsInt(),
