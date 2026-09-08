@@ -379,8 +379,7 @@ public class CombatReplayPlugin extends Plugin
 	@Subscribe
 	public void onNpcChanged(NpcChanged event)
 	{
-		recorder.addEvent("NPC_CHANGED", event.getNpc(), null, event.getNpc().getId(), 0,
-			event.getNpc().getLocalLocation(), null);
+		recorder.captureNpcTransform(event.getNpc(), event.getOld());
 	}
 
 	@Subscribe
@@ -457,6 +456,7 @@ public class CombatReplayPlugin extends Plugin
 
 	private void recordObject(String type, TileObject object)
 	{
+		recorder.captureObjectDefinition(object.getId());
 		recorder.addEvent(type, null, null, object.getId(), object.getPlane(),
 			object.getLocalLocation(), null);
 	}

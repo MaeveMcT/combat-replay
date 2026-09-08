@@ -25,6 +25,8 @@ final class CombatRecording
 	final long endedAtEpochMillis;
 	final String name;
 	final List<RecordedTick> ticks;
+	final Map<Integer, NpcDefinitionMetadata> npcDefinitions;
+	final Map<Integer, ObjectDefinitionMetadata> objectDefinitions;
 
 	CombatRecording(long startedAtEpochMillis)
 	{
@@ -35,12 +37,15 @@ final class CombatRecording
 		Integer gameRevision)
 	{
 		this(FORMAT_VERSION, UUID.randomUUID().toString(), pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, 0L, null, new ArrayList<>());
+			gameRevision, startedAtEpochMillis, 0L, null, new ArrayList<>(),
+			new HashMap<>(), new HashMap<>());
 	}
 
 	private CombatRecording(int formatVersion, String recordingId, String pluginVersion,
 		String runeLiteVersion, Integer gameRevision, long startedAtEpochMillis,
-		long endedAtEpochMillis, String name, List<RecordedTick> ticks)
+		long endedAtEpochMillis, String name, List<RecordedTick> ticks,
+		Map<Integer, NpcDefinitionMetadata> npcDefinitions,
+		Map<Integer, ObjectDefinitionMetadata> objectDefinitions)
 	{
 		this.formatVersion = formatVersion;
 		this.recordingId = recordingId;
@@ -51,11 +56,23 @@ final class CombatRecording
 		this.endedAtEpochMillis = endedAtEpochMillis;
 		this.name = name;
 		this.ticks = ticks;
+		this.npcDefinitions = npcDefinitions;
+		this.objectDefinitions = objectDefinitions;
 	}
 
 	void add(RecordedTick tick)
 	{
 		ticks.add(tick);
+	}
+
+	void recordNpcDefinition(int id, NpcDefinitionMetadata metadata)
+	{
+		if (id >= 0 && metadata != null) npcDefinitions.putIfAbsent(id, metadata);
+	}
+
+	void recordObjectDefinition(int id, ObjectDefinitionMetadata metadata)
+	{
+		if (id >= 0 && metadata != null) objectDefinitions.putIfAbsent(id, metadata);
 	}
 
 	void appendToLastTick(List<ContainerSnapshot> containers, List<RecordedEvent> events)
@@ -70,16 +87,21 @@ final class CombatRecording
 
 	CombatRecording snapshot()
 	{
-		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, endedAtEpochMillis, name,
-			Collections.unmodifiableList(new ArrayList<>(ticks)));
+		return copy(endedAtEpochMillis, name);
 	}
 
 	CombatRecording completed(long endedAt)
 	{
+		return copy(endedAt, generatedName());
+	}
+
+	private CombatRecording copy(long endedAt, String copiedName)
+	{
 		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, endedAt, generatedName(),
-			Collections.unmodifiableList(new ArrayList<>(ticks)));
+			gameRevision, startedAtEpochMillis, endedAt, copiedName,
+			Collections.unmodifiableList(new ArrayList<>(ticks)),
+			Collections.unmodifiableMap(new HashMap<>(npcDefinitions)),
+			Collections.unmodifiableMap(new HashMap<>(objectDefinitions)));
 	}
 
 	private String generatedName()
@@ -121,9 +143,20 @@ final class CombatRecording
 	static CombatRecording restored(String recordingId, String pluginVersion, String runeLiteVersion,
 		Integer gameRevision, long startedAt, long endedAt, String name, List<RecordedTick> ticks)
 	{
+		return restored(recordingId, pluginVersion, runeLiteVersion, gameRevision, startedAt,
+			endedAt, name, ticks, Collections.emptyMap(), Collections.emptyMap());
+	}
+
+	static CombatRecording restored(String recordingId, String pluginVersion, String runeLiteVersion,
+		Integer gameRevision, long startedAt, long endedAt, String name, List<RecordedTick> ticks,
+		Map<Integer, NpcDefinitionMetadata> npcDefinitions,
+		Map<Integer, ObjectDefinitionMetadata> objectDefinitions)
+	{
 		return new CombatRecording(FORMAT_VERSION, recordingId, pluginVersion, runeLiteVersion,
 			gameRevision, startedAt, endedAt, name,
-			Collections.unmodifiableList(new ArrayList<>(ticks)));
+			Collections.unmodifiableList(new ArrayList<>(ticks)),
+			Collections.unmodifiableMap(new HashMap<>(npcDefinitions)),
+			Collections.unmodifiableMap(new HashMap<>(objectDefinitions)));
 	}
 
 	static CombatRecording restored(long startedAt, long endedAt, String name, List<RecordedTick> ticks)
@@ -134,8 +167,6 @@ final class CombatRecording
 
 	CombatRecording renamed(String newName)
 	{
-		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, endedAtEpochMillis, newName,
-			Collections.unmodifiableList(new ArrayList<>(ticks)));
+		return copy(endedAtEpochMillis, newName);
 	}
 }

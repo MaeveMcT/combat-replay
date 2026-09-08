@@ -57,7 +57,8 @@ final class ReplayV1Format
         JsonArray capabilities = new JsonArray();
         for (String capability : new String[]{
             "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
-            "inventory", "equipment", "active_prayers", "container_changes", "event_confidence"
+            "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
+            "npc_definitions", "object_definitions"
         })
         {
             capabilities.add(capability);
@@ -86,6 +87,29 @@ final class ReplayV1Format
         names.forEach((id, name) -> items.addProperty(Integer.toString(id), name));
         JsonObject dictionaries = new JsonObject();
         dictionaries.add("items", items);
+        JsonObject npcs = new JsonObject();
+        new java.util.TreeMap<>(recording.npcDefinitions).forEach((id, metadata) ->
+        {
+            JsonObject value = new JsonObject();
+            addNullable(value, "name", metadata.name);
+            addNullableInteger(value, "combat_level", metadata.combatLevel);
+            value.addProperty("size", metadata.size);
+            npcs.add(Integer.toString(id), value);
+        });
+        dictionaries.add("npcs", npcs);
+        JsonObject objects = new JsonObject();
+        new java.util.TreeMap<>(recording.objectDefinitions).forEach((id, metadata) ->
+        {
+            JsonObject value = new JsonObject();
+            addNullable(value, "name", metadata.name);
+            addNullableInteger(value, "effective_definition_id", metadata.effectiveDefinitionId);
+            value.addProperty("size_x", metadata.sizeX);
+            value.addProperty("size_y", metadata.sizeY);
+            addNullableInteger(value, "map_icon_id", metadata.mapIconId);
+            addNullableInteger(value, "map_scene_id", metadata.mapSceneId);
+            objects.add(Integer.toString(id), value);
+        });
+        dictionaries.add("objects", objects);
         return dictionaries;
     }
 
@@ -294,6 +318,11 @@ final class ReplayV1Format
         addNullable(value, "target_key", event.targetKey);
         addNullableInteger(value, "definition_id", event.id);
         addNullableInteger(value, "amount", event.value);
+        if (event.fromDefinitionId != null || event.toDefinitionId != null || "NPC_CHANGED".equals(event.type))
+        {
+            addNullableInteger(value, "from_definition_id", event.fromDefinitionId);
+            addNullableInteger(value, "to_definition_id", event.toDefinitionId);
+        }
         if (event.sceneX < 0 || event.sceneY < 0)
         {
             value.add("location", JsonNull.INSTANCE);
@@ -402,7 +431,10 @@ final class ReplayV1Format
             throw new IllegalArgumentException("Unsupported combat recording format");
         }
         ReplayV1SemanticValidator.validate(root);
-        Map<Integer, String> itemNames = itemNames(root.getAsJsonObject("dictionaries"));
+        JsonObject dictionaries = root.getAsJsonObject("dictionaries");
+        Map<Integer, String> itemNames = itemNames(dictionaries);
+        Map<Integer, NpcDefinitionMetadata> npcDefinitions = npcDefinitions(dictionaries);
+        Map<Integer, ObjectDefinitionMetadata> objectDefinitions = objectDefinitions(dictionaries);
         Map<String, ActorSnapshot> actors = new LinkedHashMap<>();
         Map<String, SceneTileSnapshot> scene = new LinkedHashMap<>();
         List<RecordedTick> ticks = new java.util.ArrayList<>();
@@ -492,7 +524,7 @@ final class ReplayV1Format
             nullableInteger(producer, "game_revision", null),
             Instant.parse(root.get("started_at").getAsString()).toEpochMilli(),
             Instant.parse(root.get("ended_at").getAsString()).toEpochMilli(),
-            root.get("name").getAsString(), ticks);
+            root.get("name").getAsString(), ticks, npcDefinitions, objectDefinitions);
     }
 
     private static void requireCompleteActor(JsonObject actor)
@@ -584,6 +616,8 @@ final class ReplayV1Format
                 nullableIntValue(value, "game_cycle", -1, -1), nullableInteger(value, "sequence", null),
                 nullableString(value, "actor_key", null), nullableString(value, "target_key", null),
                 nullableInteger(value, "definition_id", null), nullableInteger(value, "amount", null),
+                nullableInteger(value, "from_definition_id", null),
+                nullableInteger(value, "to_definition_id", null),
                 location == null ? null : nullableString(location, "view_key", null),
                 location == null ? null : nullableInteger(location, "plane", null),
                 location == null ? -1 : location.get("x").getAsInt(),
@@ -591,6 +625,37 @@ final class ReplayV1Format
                 location == null ? null : location.get("coordinate_space").getAsString(),
                 nullableString(value, "detail", null), value.get("evidence").getAsString(),
                 nullableString(value, "rule_id", null), strings(value.get("evidence_event_ids"))));
+        }
+        return result;
+    }
+
+    private static Map<Integer, NpcDefinitionMetadata> npcDefinitions(JsonObject dictionaries)
+    {
+        Map<Integer, NpcDefinitionMetadata> result = new LinkedHashMap<>();
+        JsonObject values = object(dictionaries, "npcs");
+        if (values == null) return result;
+        for (Map.Entry<String, com.google.gson.JsonElement> entry : values.entrySet())
+        {
+            JsonObject value = entry.getValue().getAsJsonObject();
+            result.put(Integer.parseInt(entry.getKey()), new NpcDefinitionMetadata(
+                nullableString(value, "name", null), nullableInteger(value, "combat_level", null),
+                value.get("size").getAsInt()));
+        }
+        return result;
+    }
+
+    private static Map<Integer, ObjectDefinitionMetadata> objectDefinitions(JsonObject dictionaries)
+    {
+        Map<Integer, ObjectDefinitionMetadata> result = new LinkedHashMap<>();
+        JsonObject values = object(dictionaries, "objects");
+        if (values == null) return result;
+        for (Map.Entry<String, com.google.gson.JsonElement> entry : values.entrySet())
+        {
+            JsonObject value = entry.getValue().getAsJsonObject();
+            result.put(Integer.parseInt(entry.getKey()), new ObjectDefinitionMetadata(
+                nullableString(value, "name", null), nullableInteger(value, "effective_definition_id", null),
+                value.get("size_x").getAsInt(), value.get("size_y").getAsInt(),
+                nullableInteger(value, "map_icon_id", null), nullableInteger(value, "map_scene_id", null)));
         }
         return result;
     }

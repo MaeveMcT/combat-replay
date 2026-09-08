@@ -221,12 +221,15 @@ final class ReplayViewerFrame extends JFrame
 					+ (event.id == null ? " [item unavailable]" : " [item " + event.id + "]")); break;
 				case "PRAYER_CHANGE": if (event.value != null) result.add(pretty(event.detail) + (event.value == 1 ? " activated" : " deactivated")); break;
 				case "DEATH": result.add(actor + " died"); break;
-				case "PROJECTILE": result.add(actor + " launched projectile "
-					+ (event.id == null ? "(definition unavailable)" : event.id)
-					+ (event.targetKey == null ? " (target unknown)" : " at " + names.getOrDefault(event.targetKey, "Actor"))
-					+ " (observed)"); break;
-				case "ANIMATION": result.add(event.id == null
-					? "Animation observed (definition unavailable)" : "Animation " + event.id + " observed"); break;
+				case "PROJECTILE": result.add("A projectile moved"
+					+ (event.actorKey == null ? " (source unavailable)" : " from " + actor)
+					+ (event.targetKey == null ? " (target unavailable)" : " toward " + names.getOrDefault(event.targetKey, "Actor"))
+					+ (event.id == null ? " [definition unavailable]" : " [definition " + event.id + "]")); break;
+				case "ANIMATION": result.add(actor + " changed animation"
+					+ (event.id == null ? " [definition unavailable]" : " [definition " + event.id + "]")); break;
+				case "NPC_CHANGED": result.add(actor + " changed form"
+					+ " [" + (event.fromDefinitionId == null ? "unavailable" : event.fromDefinitionId)
+					+ " → " + (event.toDefinitionId == null ? "unavailable" : event.toDefinitionId) + "]"); break;
 				case "MECHANIC": result.add(event.detail + " (inferred)"); break;
 				default: break;
 			}

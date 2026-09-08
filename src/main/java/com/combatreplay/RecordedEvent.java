@@ -14,6 +14,8 @@ final class RecordedEvent
 	final String targetKey;
 	final Integer id;
 	final Integer value;
+	final Integer fromDefinitionId;
+	final Integer toDefinitionId;
 	final String viewKey;
 	final Integer plane;
 	final int sceneX;
@@ -38,6 +40,16 @@ final class RecordedEvent
 		int sceneX, int sceneY, String coordinateSpace, String detail, String evidence,
 		String ruleId, List<String> evidenceEventIds)
 	{
+		this(eventId, type, gameCycle, sequence, actorKey, targetKey, id, value, null, null,
+			viewKey, plane, sceneX, sceneY, coordinateSpace, detail, evidence, ruleId, evidenceEventIds);
+	}
+
+	RecordedEvent(String eventId, String type, int gameCycle, Integer sequence,
+		String actorKey, String targetKey, Integer id, Integer value, Integer fromDefinitionId,
+		Integer toDefinitionId, String viewKey, Integer plane, int sceneX, int sceneY,
+		String coordinateSpace, String detail, String evidence, String ruleId,
+		List<String> evidenceEventIds)
+	{
 		this.eventId = eventId;
 		this.type = type;
 		this.gameCycle = gameCycle;
@@ -46,6 +58,8 @@ final class RecordedEvent
 		this.targetKey = targetKey;
 		this.id = id;
 		this.value = value;
+		this.fromDefinitionId = fromDefinitionId;
+		this.toDefinitionId = toDefinitionId;
 		this.viewKey = viewKey;
 		this.plane = plane;
 		this.sceneX = sceneX;

@@ -75,6 +75,34 @@ public class ReplayV1FormatTest
     }
 
     @Test
+    public void roundTripsRecordingLocalDefinitionsAndNpcTransformEvidence()
+    {
+        CombatRecording recording = new CombatRecording(1_000L);
+        recording.recordNpcDefinition(9037, new NpcDefinitionMetadata("Corrupted Hunllef", 674, 1));
+        recording.recordNpcDefinition(9036, new NpcDefinitionMetadata("Corrupted Hunllef (tornado phase)", 674, 1));
+        recording.recordObjectDefinition(36048,
+            new ObjectDefinitionMetadata(null, 36049, 2, 1, null, 12));
+        RecordedEvent transform = new RecordedEvent("event-1", "NPC_CHANGED", 100, null,
+            "player-1", null, 9036, null, 9037, 9036, null, null, -1, -1, null,
+            null, "observed", null, Collections.emptyList());
+        recording.add(new RecordedTick(0, 100, 3200, 3200, false,
+            90, 99, 70, 70, Collections.singletonList(player("player-1", "Alice", true)),
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+            Collections.singletonList(transform)));
+
+        JsonObject encoded = ReplayV1Format.encode(recording.completed(1_600L));
+        CombatRecording decoded = ReplayV1Format.decode(encoded);
+
+        assertEquals("Corrupted Hunllef", decoded.npcDefinitions.get(9037).name);
+        assertNull(decoded.objectDefinitions.get(36048).name);
+        assertEquals(Integer.valueOf(36049), decoded.objectDefinitions.get(36048).effectiveDefinitionId);
+        assertEquals(Integer.valueOf(9037), decoded.ticks.get(0).events.get(0).fromDefinitionId);
+        assertEquals(Integer.valueOf(9036), decoded.ticks.get(0).events.get(0).toDefinitionId);
+        assertTrue(encoded.getAsJsonObject("capture").getAsJsonArray("capabilities")
+            .contains(new com.google.gson.JsonPrimitive("npc_definitions")));
+    }
+
+    @Test
     public void reconstructsNullClearsRemovalsReappearanceAndInstanceTransition() throws Exception
     {
         JsonObject fixture;

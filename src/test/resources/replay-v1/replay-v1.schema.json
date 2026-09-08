@@ -4,113 +4,308 @@
   "title": "Combat Replay Recording v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format_version", "recording_id", "name", "started_at", "ended_at", "producer", "capture", "dictionaries", "ticks"],
+  "required": [
+    "format_version",
+    "recording_id",
+    "name",
+    "started_at",
+    "ended_at",
+    "producer",
+    "capture",
+    "dictionaries",
+    "ticks"
+  ],
   "properties": {
-    "format_version": { "const": 1 },
-    "recording_id": { "type": "string", "format": "uuid" },
-    "name": { "type": "string", "minLength": 1, "maxLength": 300 },
-    "started_at": { "type": "string", "format": "date-time" },
-    "ended_at": { "type": "string", "format": "date-time" },
-    "producer": { "$ref": "#/$defs/producer" },
-    "capture": { "$ref": "#/$defs/capture" },
-    "dictionaries": { "$ref": "#/$defs/dictionaries" },
+    "format_version": {
+      "const": 1
+    },
+    "recording_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "capture": {
+      "$ref": "#/$defs/capture"
+    },
+    "dictionaries": {
+      "$ref": "#/$defs/dictionaries"
+    },
     "ticks": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/tick" }
+      "items": {
+        "$ref": "#/$defs/tick"
+      }
     }
   },
   "$defs": {
-    "nullableInteger": { "type": ["integer", "null"] },
+    "nullableInteger": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "producer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["plugin_name", "plugin_version", "runelite_version", "game_revision"],
+      "required": [
+        "plugin_name",
+        "plugin_version",
+        "runelite_version",
+        "game_revision"
+      ],
       "properties": {
-        "plugin_name": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "plugin_version": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "runelite_version": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "java_version": { "type": ["string", "null"], "maxLength": 100 },
-        "game_revision": { "$ref": "#/$defs/nullableInteger" }
+        "plugin_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plugin_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "runelite_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "java_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "game_revision": {
+          "$ref": "#/$defs/nullableInteger"
+        }
       }
     },
     "capture": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nominal_tick_millis", "local_actor_key", "initial_world", "capabilities"],
+      "required": [
+        "nominal_tick_millis",
+        "local_actor_key",
+        "initial_world",
+        "capabilities"
+      ],
       "properties": {
-        "nominal_tick_millis": { "type": "integer", "minimum": 1 },
-        "local_actor_key": { "type": ["string", "null"], "maxLength": 100 },
-        "initial_world": { "$ref": "#/$defs/nullableInteger" },
+        "nominal_tick_millis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "local_actor_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "initial_world": {
+          "$ref": "#/$defs/nullableInteger"
+        },
         "capabilities": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 100 }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 100
+          }
         }
       }
     },
     "dictionaries": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "properties": {
         "items": {
           "type": "object",
-          "propertyNames": { "pattern": "^-?[0-9]+$" },
-          "additionalProperties": { "type": "string", "maxLength": 300 }
+          "propertyNames": {
+            "pattern": "^-?[0-9]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "maxProperties": 4096
+        },
+        "npcs": {
+          "type": "object",
+          "maxProperties": 4096,
+          "propertyNames": {
+            "pattern": "^[0-9]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/npcDefinition"
+          }
+        },
+        "objects": {
+          "type": "object",
+          "maxProperties": 8192,
+          "propertyNames": {
+            "pattern": "^[0-9]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/objectDefinition"
+          }
         }
       }
     },
     "tick": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["index", "keyframe", "sync", "actors", "scene", "events"],
+      "required": [
+        "index",
+        "keyframe",
+        "sync",
+        "actors",
+        "scene",
+        "events"
+      ],
       "properties": {
-        "index": { "type": "integer", "minimum": 0 },
-        "keyframe": { "type": "boolean" },
-        "sync": { "$ref": "#/$defs/sync" },
-        "context": { "oneOf": [{ "$ref": "#/$defs/context" }, { "type": "null" }] },
-        "local_state": { "oneOf": [{ "$ref": "#/$defs/localState" }, { "type": "null" }] },
-        "actors": { "$ref": "#/$defs/actorOperations" },
-        "scene": { "$ref": "#/$defs/sceneOperations" },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "keyframe": {
+          "type": "boolean"
+        },
+        "sync": {
+          "$ref": "#/$defs/sync"
+        },
+        "context": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/context"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_state": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/localState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actors": {
+          "$ref": "#/$defs/actorOperations"
+        },
+        "scene": {
+          "$ref": "#/$defs/sceneOperations"
+        },
         "container_changes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/containerChange" }
+          "items": {
+            "$ref": "#/$defs/containerChange"
+          }
         },
         "events": {
           "type": "array",
-          "items": { "$ref": "#/$defs/event" }
+          "items": {
+            "$ref": "#/$defs/event"
+          }
         }
       }
     },
     "sync": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["game_cycle", "client_tick", "observed_at", "elapsed_millis"],
+      "required": [
+        "game_cycle",
+        "client_tick",
+        "observed_at",
+        "elapsed_millis"
+      ],
       "properties": {
-        "game_cycle": { "$ref": "#/$defs/nullableInteger" },
-        "client_tick": { "$ref": "#/$defs/nullableInteger" },
-        "observed_at": { "type": "string", "format": "date-time" },
-        "elapsed_millis": { "type": "integer", "minimum": 0 }
+        "game_cycle": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "client_tick": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "elapsed_millis": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "context": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "world": { "$ref": "#/$defs/nullableInteger" },
-        "view_key": { "type": ["string", "null"], "maxLength": 100 },
-        "plane": { "type": ["integer", "null"], "minimum": 0, "maximum": 3 },
-        "base_x": { "$ref": "#/$defs/nullableInteger" },
-        "base_y": { "$ref": "#/$defs/nullableInteger" },
-        "instanced": { "type": ["boolean", "null"] },
+        "world": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "view_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "plane": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 3
+        },
+        "base_x": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "base_y": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "instanced": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "instance_template_chunks": {
-          "type": ["array", "null"],
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "array",
             "items": {
               "type": "array",
-              "items": { "type": "integer" }
+              "items": {
+                "type": "integer"
+              }
             }
           }
         }
@@ -120,169 +315,583 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "hitpoints": { "$ref": "#/$defs/nullableInteger" },
-        "base_hitpoints": { "$ref": "#/$defs/nullableInteger" },
-        "prayer": { "$ref": "#/$defs/nullableInteger" },
-        "base_prayer": { "$ref": "#/$defs/nullableInteger" },
+        "hitpoints": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "base_hitpoints": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "prayer": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "base_prayer": {
+          "$ref": "#/$defs/nullableInteger"
+        },
         "inventory": {
           "oneOf": [
-            { "type": "array", "items": { "$ref": "#/$defs/item" } },
-            { "type": "null" }
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "equipment": {
           "oneOf": [
-            { "type": "array", "items": { "$ref": "#/$defs/item" } },
-            { "type": "null" }
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "active_prayers": {
-          "type": ["array", "null"],
-          "items": { "type": "string", "maxLength": 100 }
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
         }
       }
     },
     "item": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["slot", "item_id", "quantity"],
+      "required": [
+        "slot",
+        "item_id",
+        "quantity"
+      ],
       "properties": {
-        "slot": { "type": "integer", "minimum": 0 },
-        "item_id": { "type": "integer" },
-        "quantity": { "type": "integer", "minimum": 1 }
+        "slot": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "item_id": {
+          "type": "integer"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "actorOperations": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["upsert", "remove"],
+      "required": [
+        "upsert",
+        "remove"
+      ],
       "properties": {
-        "upsert": { "type": "array", "items": { "$ref": "#/$defs/actorDelta" } },
-        "remove": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 100 } }
+        "upsert": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/actorDelta"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
       }
     },
     "actorDelta": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key"],
+      "required": [
+        "key"
+      ],
       "properties": {
-        "key": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "kind": { "type": ["string", "null"], "enum": ["player", "npc", null] },
-        "display_name": { "type": ["string", "null"], "maxLength": 300 },
-        "is_local_player": { "type": ["boolean", "null"] },
-        "npc_id": { "$ref": "#/$defs/nullableInteger" },
-        "view_key": { "type": ["string", "null"], "maxLength": 100 },
-        "world_x": { "$ref": "#/$defs/nullableInteger" },
-        "world_y": { "$ref": "#/$defs/nullableInteger" },
-        "scene_x": { "$ref": "#/$defs/nullableInteger" },
-        "scene_y": { "$ref": "#/$defs/nullableInteger" },
-        "local_x": { "$ref": "#/$defs/nullableInteger" },
-        "local_y": { "$ref": "#/$defs/nullableInteger" },
-        "plane": { "type": ["integer", "null"], "minimum": 0, "maximum": 3 },
-        "size": { "type": ["integer", "null"], "minimum": 1 },
-        "orientation": { "$ref": "#/$defs/nullableInteger" },
-        "animation_id": { "$ref": "#/$defs/nullableInteger" },
-        "pose_animation_id": { "$ref": "#/$defs/nullableInteger" },
-        "health_ratio": { "$ref": "#/$defs/nullableInteger" },
-        "health_scale": { "$ref": "#/$defs/nullableInteger" },
-        "target_key": { "type": ["string", "null"], "maxLength": 100 },
-        "dead": { "type": ["boolean", "null"] },
-        "visible_equipment": {
-          "oneOf": [
-            { "type": "array", "items": { "$ref": "#/$defs/item" } },
-            { "type": "null" }
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "player",
+            "npc",
+            null
           ]
         },
-        "overhead_icon": { "type": ["string", "null"], "maxLength": 100 }
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "is_local_player": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "npc_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "view_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "world_x": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "world_y": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "scene_x": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "scene_y": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "local_x": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "local_y": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "plane": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 3
+        },
+        "size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "orientation": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "animation_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "pose_animation_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "health_ratio": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "health_scale": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "target_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "dead": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "visible_equipment": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overhead_icon": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        }
       }
     },
     "sceneOperations": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["upsert", "remove"],
+      "required": [
+        "upsert",
+        "remove"
+      ],
       "properties": {
-        "upsert": { "type": "array", "items": { "$ref": "#/$defs/sceneTile" } },
-        "remove": { "type": "array", "items": { "$ref": "#/$defs/tileKey" } }
+        "upsert": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sceneTile"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tileKey"
+          }
+        }
       }
     },
     "tileKey": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["view_key", "plane", "x", "y"],
+      "required": [
+        "view_key",
+        "plane",
+        "x",
+        "y"
+      ],
       "properties": {
-        "view_key": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "plane": { "type": "integer", "minimum": 0, "maximum": 3 },
-        "x": { "type": "integer" },
-        "y": { "type": "integer" }
+        "view_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plane": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        }
       }
     },
     "sceneTile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["view_key", "plane", "x", "y", "height", "terrain_rgb", "collision_flags", "wall_object_id", "ground_object_id", "decorative_object_id", "game_object_ids"],
+      "required": [
+        "view_key",
+        "plane",
+        "x",
+        "y",
+        "height",
+        "terrain_rgb",
+        "collision_flags",
+        "wall_object_id",
+        "ground_object_id",
+        "decorative_object_id",
+        "game_object_ids"
+      ],
       "properties": {
-        "view_key": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "plane": { "type": "integer", "minimum": 0, "maximum": 3 },
-        "x": { "type": "integer" },
-        "y": { "type": "integer" },
-        "height": { "type": "integer" },
-        "terrain_rgb": { "$ref": "#/$defs/nullableInteger" },
-        "collision_flags": { "type": "integer" },
-        "wall_object_id": { "$ref": "#/$defs/nullableInteger" },
-        "ground_object_id": { "$ref": "#/$defs/nullableInteger" },
-        "decorative_object_id": { "$ref": "#/$defs/nullableInteger" },
-        "game_object_ids": { "type": "array", "uniqueItems": true, "items": { "type": "integer" } }
+        "view_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plane": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        },
+        "terrain_rgb": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "collision_flags": {
+          "type": "integer"
+        },
+        "wall_object_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "ground_object_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "decorative_object_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "game_object_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer"
+          }
+        }
       }
     },
     "containerChange": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["container", "game_cycle", "items"],
+      "required": [
+        "container",
+        "game_cycle",
+        "items"
+      ],
       "properties": {
-        "container": { "type": "string", "enum": ["inventory", "equipment"] },
-        "game_cycle": { "$ref": "#/$defs/nullableInteger" },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+        "container": {
+          "type": "string",
+          "enum": [
+            "inventory",
+            "equipment"
+          ]
+        },
+        "game_cycle": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
       }
     },
     "event": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["event_id", "type", "game_cycle", "sequence", "actor_key", "target_key", "definition_id", "amount", "location", "detail", "evidence", "rule_id", "evidence_event_ids"],
+      "required": [
+        "event_id",
+        "type",
+        "game_cycle",
+        "sequence",
+        "actor_key",
+        "target_key",
+        "definition_id",
+        "amount",
+        "location",
+        "detail",
+        "evidence",
+        "rule_id",
+        "evidence_event_ids"
+      ],
       "properties": {
-        "event_id": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 100 },
-        "game_cycle": { "$ref": "#/$defs/nullableInteger" },
-        "sequence": { "$ref": "#/$defs/nullableInteger" },
-        "actor_key": { "type": ["string", "null"], "maxLength": 100 },
-        "target_key": { "type": ["string", "null"], "maxLength": 100 },
-        "definition_id": { "$ref": "#/$defs/nullableInteger" },
-        "amount": { "$ref": "#/$defs/nullableInteger" },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 100
+        },
+        "game_cycle": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "sequence": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "actor_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "target_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "definition_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "amount": {
+          "$ref": "#/$defs/nullableInteger"
+        },
         "location": {
           "oneOf": [
-            { "$ref": "#/$defs/eventLocation" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/eventLocation"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "detail": { "type": ["string", "null"], "maxLength": 1000 },
-        "evidence": { "type": "string", "enum": ["observed", "inferred", "unknown"] },
-        "rule_id": { "type": ["string", "null"], "maxLength": 200 },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
+        },
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "rule_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
         "evidence_event_ids": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "maxLength": 100 }
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "from_definition_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "to_definition_id": {
+          "$ref": "#/$defs/nullableInteger"
         }
       }
     },
     "eventLocation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["view_key", "plane", "x", "y", "coordinate_space"],
+      "required": [
+        "view_key",
+        "plane",
+        "x",
+        "y",
+        "coordinate_space"
+      ],
       "properties": {
-        "view_key": { "type": ["string", "null"], "maxLength": 100 },
-        "plane": { "type": ["integer", "null"], "minimum": 0, "maximum": 3 },
-        "x": { "type": "integer" },
-        "y": { "type": "integer" },
-        "coordinate_space": { "type": "string", "enum": ["world", "scene", "local"] }
+        "view_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "plane": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 3
+        },
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        },
+        "coordinate_space": {
+          "type": "string",
+          "enum": [
+            "world",
+            "scene",
+            "local"
+          ]
+        }
+      }
+    },
+    "npcDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "combat_level",
+        "size"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "combat_level": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "objectDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "effective_definition_id",
+        "size_x",
+        "size_y",
+        "map_icon_id",
+        "map_scene_id"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "size_x": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "size_y": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "map_icon_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "map_scene_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "effective_definition_id": {
+          "$ref": "#/$defs/nullableInteger"
+        }
       }
     }
   }

@@ -34,6 +34,7 @@ import net.runelite.client.RuneLiteProperties;
 final class CombatRecorder
 {
 	private final Client client;
+	private final DefinitionMetadataResolver metadataResolver;
 	private final Map<Actor, String> actorKeys = new IdentityHashMap<>();
 	private final List<RecordedEvent> pendingEvents = new ArrayList<>();
 	private final List<ContainerSnapshot> pendingContainerChanges = new ArrayList<>();
@@ -47,10 +48,16 @@ final class CombatRecorder
 	private int previousPrayer = -1;
 	private long recordingStartedNanos;
 
-	@Inject
 	CombatRecorder(Client client)
 	{
+		this(client, new RuneLiteDefinitionMetadataResolver(client));
+	}
+
+	@Inject
+	CombatRecorder(Client client, RuneLiteDefinitionMetadataResolver metadataResolver)
+	{
 		this.client = client;
+		this.metadataResolver = metadataResolver;
 	}
 
 	void start()
@@ -126,6 +133,29 @@ final class CombatRecorder
 					attribution.ruleId, attribution.evidenceEventIds));
 			}
 		}
+	}
+
+	void captureNpcTransform(NPC npc, NPCComposition oldComposition)
+	{
+		if (!isRecording() || npc == null) return;
+		NPCComposition current = npc.getTransformedComposition();
+		Integer fromId = oldComposition == null ? null : oldComposition.getId();
+		Integer toId = current == null ? null : current.getId();
+		recordNpcDefinition(oldComposition);
+		recordNpcDefinition(current);
+		LocalPoint location = npc.getLocalLocation();
+		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "NPC_CHANGED",
+			client.getGameCycle(), null, keyFor(npc), null, toId, null, fromId, toId,
+			null, null, location == null ? -1 : location.getSceneX(),
+			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
+			null, "observed", null, java.util.Collections.emptyList()));
+	}
+
+	void captureObjectDefinition(int definitionId)
+	{
+		if (!isRecording() || definitionId < 0 || recording.objectDefinitions.containsKey(definitionId)) return;
+		DefinitionMetadataResolver.ResolvedObjectDefinition resolved = metadataResolver.object(definitionId);
+		if (resolved != null) recording.recordObjectDefinition(definitionId, resolved.metadata);
 	}
 
 	void captureContainerChange(int containerId, ItemContainer container)
@@ -296,10 +326,14 @@ final class CombatRecorder
 						if (object != null && !ids.contains(object.getId()))
 						{
 							ids.add(object.getId());
+							captureObjectDefinition(object.getId());
 						}
 					}
 				}
 				int[] objectIds = ids.stream().mapToInt(Integer::intValue).toArray();
+				captureObjectDefinition(objectId(tile.getWallObject()));
+				captureObjectDefinition(objectId(tile.getGroundObject()));
+				captureObjectDefinition(objectId(tile.getDecorativeObject()));
 				SceneTileSnapshot snapshot = new SceneTileSnapshot(viewIdentity(worldView), plane,
 					worldView.getBaseX() + x, worldView.getBaseY() + y,
 					heightAt(worldView, plane, x, y), color, flags, objectId(tile.getWallObject()),
@@ -367,7 +401,8 @@ final class CombatRecorder
 		WorldPoint world = actor.getWorldLocation();
 		boolean npc = actor instanceof NPC;
 		NPCComposition composition = npc ? ((NPC) actor).getTransformedComposition() : null;
-		int npcId = npc ? ((NPC) actor).getId() : -1;
+		int npcId = composition == null ? npc ? ((NPC) actor).getId() : -1 : composition.getId();
+		if (npc) recordNpcDefinition(composition);
 		String label;
 		if (npc)
 		{
@@ -389,6 +424,14 @@ final class CombatRecorder
 			actor.getCurrentOrientation(), actor.getAnimation(), actor.getPoseAnimation(),
 			actor.getHealthRatio(), actor.getHealthScale(), keyFor(actor.getInteracting()), actor.isDead(),
 			visibleEquipment, overheadIcon);
+	}
+
+	private void recordNpcDefinition(NPCComposition composition)
+	{
+		if (composition != null && !recording.npcDefinitions.containsKey(composition.getId()))
+		{
+			recording.recordNpcDefinition(composition.getId(), metadataResolver.npc(composition));
+		}
 	}
 
 	private List<ItemSnapshot> snapshotVisibleEquipment(Player player)

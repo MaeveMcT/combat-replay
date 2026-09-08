@@ -171,6 +171,36 @@ public class CombatRecorderV1Test
         assertEquals(3, attribution.evidenceEventIds.size());
     }
 
+    @Test
+    public void capturesBothRecordedNpcTransformDefinitions()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
+        NPC npc = npc("Hunllef", fixture.worldView, 3201);
+        NPCComposition oldComposition = mock(NPCComposition.class);
+        NPCComposition newComposition = mock(NPCComposition.class);
+        when(oldComposition.getId()).thenReturn(9037);
+        when(oldComposition.getName()).thenReturn("Corrupted Hunllef");
+        when(oldComposition.getCombatLevel()).thenReturn(674);
+        when(oldComposition.getSize()).thenReturn(1);
+        when(newComposition.getId()).thenReturn(9036);
+        when(newComposition.getName()).thenReturn("Corrupted Hunllef (tornado phase)");
+        when(newComposition.getCombatLevel()).thenReturn(674);
+        when(newComposition.getSize()).thenReturn(1);
+        when(npc.getTransformedComposition()).thenReturn(newComposition);
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        fixture.recorder.captureNpcTransform(npc, oldComposition);
+        CombatRecording recording = fixture.recorder.stop();
+        RecordedEvent transform = recording.ticks.get(0).events.get(0);
+
+        assertEquals("Corrupted Hunllef", recording.npcDefinitions.get(9037).name);
+        assertEquals("Corrupted Hunllef (tornado phase)", recording.npcDefinitions.get(9036).name);
+        assertEquals(Integer.valueOf(9037), transform.fromDefinitionId);
+        assertEquals(Integer.valueOf(9036), transform.toDefinitionId);
+    }
+
     private static Player player(String name, WorldView worldView, int worldX)
     {
         Player player = mock(Player.class);
