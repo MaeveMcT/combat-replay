@@ -85,7 +85,9 @@ final class ReplayV1Format
             }
             for (GroundItemSnapshot item : tick.groundItemUpserts)
             {
-                if (item.itemName != null && !item.itemName.isEmpty()) names.putIfAbsent(item.itemId, item.itemName);
+                if (item.itemName != null && !item.itemName.isEmpty()
+                    && (names.containsKey(item.itemId) || names.size() < 4096))
+                    names.putIfAbsent(item.itemId, item.itemName);
             }
         }
         JsonObject items = new JsonObject();
@@ -530,7 +532,8 @@ final class ReplayV1Format
         {
             for (ItemSnapshot item : items)
             {
-                if (item.name != null && !item.name.isEmpty())
+                if (item.name != null && !item.name.isEmpty()
+                    && (names.containsKey(item.itemId) || names.size() < 4096))
                 {
                     names.putIfAbsent(item.itemId, item.name);
                 }

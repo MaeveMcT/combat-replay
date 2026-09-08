@@ -292,7 +292,7 @@ final class CombatRecorder
 		ProjectileTracker.Delta projectileDelta = projectiles.drain(client.getGameCycle(),
 			"view-" + viewIdentity);
 		LocalCombatState combatState = captureCombatState();
-		GroundItemTracker.Delta groundItemDelta = groundItems.drain();
+		GroundItemTracker.Delta groundItemDelta = groundItems.drain("view-" + viewIdentity);
 		recording.add(new RecordedTick(recording.ticks.size(), client.getGameCycle(),
 			client.getTickCount(), observedAt, elapsedMillis, world > 0 ? world : null,
 			"view-" + viewIdentity,

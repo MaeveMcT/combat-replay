@@ -18,9 +18,9 @@ public class GroundItemTrackerTest
 		String updated = tracker.upsert(item, 23866, "Crystal shard", 5,
 			"view-main", 0, 3210, 3210, 101);
 
-		GroundItemTracker.Delta upsert = tracker.drain();
+		GroundItemTracker.Delta upsert = tracker.drain("view-main");
 		tracker.remove(item);
-		GroundItemTracker.Delta remove = tracker.drain();
+		GroundItemTracker.Delta remove = tracker.drain("view-main");
 
 		assertEquals(first, updated);
 		assertEquals(1, upsert.upserts.size());

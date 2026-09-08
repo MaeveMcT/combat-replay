@@ -67,12 +67,16 @@ final class CombatRecording
 
 	void recordNpcDefinition(int id, NpcDefinitionMetadata metadata)
 	{
-		if (id >= 0 && metadata != null) npcDefinitions.putIfAbsent(id, metadata);
+		if (id >= 0 && metadata != null
+			&& (npcDefinitions.containsKey(id) || npcDefinitions.size() < 4096))
+			npcDefinitions.putIfAbsent(id, metadata);
 	}
 
 	void recordObjectDefinition(int id, ObjectDefinitionMetadata metadata)
 	{
-		if (id >= 0 && metadata != null) objectDefinitions.putIfAbsent(id, metadata);
+		if (id >= 0 && metadata != null
+			&& (objectDefinitions.containsKey(id) || objectDefinitions.size() < 8192))
+			objectDefinitions.putIfAbsent(id, metadata);
 	}
 
 	void appendToLastTick(List<ContainerSnapshot> containers, List<RecordedEvent> events)

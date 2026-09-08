@@ -23,6 +23,7 @@ final class ProjectileTracker
 	{
 		String existing = keys.get(projectile);
 		boolean first = existing == null;
+		if (first && active.size() >= 4096) return new Observation(null, false);
 		String key = first ? "projectile-" + nextId++ : existing;
 		if (first) keys.put(projectile, key);
 		WorldPoint source = projectile.getSourcePoint();
