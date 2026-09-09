@@ -144,6 +144,26 @@ public class ReplayV1FormatTest
     }
 
     @Test
+    public void decodesGenericFightAnalysisFixture() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/generic-fights.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+
+        CombatRecording recording = ReplayV1Format.decode(fixture);
+
+        assertEquals(7, recording.ticks.size());
+        assertEquals("ACTION_ATTEMPT", recording.ticks.get(0).events.get(0).type);
+        assertEquals("mine", recording.ticks.get(4).events.get(0).detail);
+        assertEquals(Integer.valueOf(200), recording.ticks.get(5).events.get(0).fromDefinitionId);
+        assertEquals("mine", recording.ticks.get(6).events.get(0).detail);
+        assertEquals("terminal_hitsplat_local_v1", recording.ticks.get(6).events.get(2).ruleId);
+    }
+
+    @Test
     public void reconstructsNullClearsRemovalsReappearanceAndInstanceTransition() throws Exception
     {
         JsonObject fixture;
@@ -248,6 +268,9 @@ public class ReplayV1FormatTest
             Set<ValidationMessage> enrichedErrors = schema.validate(mapper.readTree(
                 getClass().getResourceAsStream("/replay-v1/valid/viewer-features.json")));
             assertTrue(enrichedErrors.toString(), enrichedErrors.isEmpty());
+            Set<ValidationMessage> fightErrors = schema.validate(mapper.readTree(
+                getClass().getResourceAsStream("/replay-v1/valid/generic-fights.json")));
+            assertTrue(fightErrors.toString(), fightErrors.isEmpty());
         }
     }
 

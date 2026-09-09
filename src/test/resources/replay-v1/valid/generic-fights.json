@@ -1,0 +1,584 @@
+{
+  "format_version": 1,
+  "recording_id": "223e4567-e89b-42d3-a456-426614174000",
+  "name": "Generic fight analysis scenarios",
+  "started_at": "2026-09-04T12:00:00Z",
+  "ended_at": "2026-09-04T12:00:03.600Z",
+  "producer": {
+    "plugin_name": "Combat Replay",
+    "plugin_version": "1.0.0",
+    "runelite_version": "1.11.0",
+    "java_version": "11",
+    "game_revision": null
+  },
+  "capture": {
+    "nominal_tick_millis": 600,
+    "local_actor_key": "player-1",
+    "initial_world": 330,
+    "capabilities": [
+      "player_names",
+      "actor_local_coordinates",
+      "scene_tiles",
+      "instance_templates",
+      "inventory",
+      "equipment",
+      "active_prayers",
+      "container_changes",
+      "event_confidence",
+      "npc_definitions",
+      "projectile_lifecycle",
+      "action_attempts"
+    ]
+  },
+  "dictionaries": {
+    "items": {
+      "385": "Shark",
+      "4151": "Abyssal whip"
+    },
+    "npcs": {
+      "100": {
+        "name": "Rat",
+        "combat_level": 1,
+        "size": 1
+      },
+      "200": {
+        "name": "Generic boss",
+        "combat_level": 100,
+        "size": 2
+      },
+      "201": {
+        "name": "Generic boss (changed form)",
+        "combat_level": 100,
+        "size": 2
+      },
+      "300": {
+        "name": "Boss add",
+        "combat_level": 20,
+        "size": 1
+      },
+      "400": {
+        "name": "Bystander",
+        "combat_level": 5,
+        "size": 1
+      }
+    }
+  },
+  "ticks": [
+    {
+      "index": 0,
+      "keyframe": true,
+      "sync": {
+        "game_cycle": 100,
+        "client_tick": 50,
+        "observed_at": "2026-09-04T12:00:00.000Z",
+        "elapsed_millis": 0
+      },
+      "context": {
+        "world": 330,
+        "view_key": "view-main",
+        "plane": 0,
+        "base_x": 3200,
+        "base_y": 3200,
+        "instanced": false,
+        "instance_template_chunks": null
+      },
+      "local_state": {
+        "hitpoints": 90,
+        "base_hitpoints": 99,
+        "prayer": 70,
+        "base_prayer": 77,
+        "inventory": [
+          {
+            "slot": 0,
+            "item_id": 385,
+            "quantity": 2
+          }
+        ],
+        "equipment": [
+          {
+            "slot": 3,
+            "item_id": 4151,
+            "quantity": 1
+          }
+        ],
+        "active_prayers": [
+          "PROTECT_FROM_MELEE",
+          "PIETY"
+        ]
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "player-1",
+            "kind": "player",
+            "display_name": "Alice",
+            "is_local_player": true,
+            "npc_id": null,
+            "view_key": "view-main",
+            "world_x": 3210,
+            "world_y": 3210,
+            "scene_x": 10,
+            "scene_y": 10,
+            "local_x": 1344,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 0,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": null,
+            "dead": false,
+            "visible_equipment": [
+              {
+                "slot": 3,
+                "item_id": 4151,
+                "quantity": 1
+              }
+            ],
+            "overhead_icon": null
+          },
+          {
+            "key": "rat",
+            "kind": "npc",
+            "display_name": "Rat",
+            "is_local_player": false,
+            "npc_id": 100,
+            "view_key": "view-main",
+            "world_x": 3211,
+            "world_y": 3210,
+            "scene_x": 11,
+            "scene_y": 10,
+            "local_x": 1472,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 512,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": null,
+            "dead": false,
+            "visible_equipment": null,
+            "overhead_icon": null
+          },
+          {
+            "key": "bystander",
+            "kind": "npc",
+            "display_name": "Bystander",
+            "is_local_player": false,
+            "npc_id": 400,
+            "view_key": "view-main",
+            "world_x": 3215,
+            "world_y": 3210,
+            "scene_x": 15,
+            "scene_y": 10,
+            "local_x": 1984,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 512,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": null,
+            "dead": false,
+            "visible_equipment": null,
+            "overhead_icon": null
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "attempt-rat",
+          "type": "action_attempt",
+          "game_cycle": 101,
+          "sequence": null,
+          "actor_key": "player-1",
+          "target_key": "rat",
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": [],
+          "action_kind": "attack_actor",
+          "menu_option": "Attack",
+          "menu_target": "Rat",
+          "menu_action": "NPC_FIRST_OPTION"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 130,
+        "client_tick": 51,
+        "observed_at": "2026-09-04T12:00:00.600Z",
+        "elapsed_millis": 600
+      },
+      "actors": {
+        "upsert": [],
+        "remove": [
+          "rat",
+          "bystander"
+        ]
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "death-bystander",
+          "type": "death",
+          "game_cycle": 130,
+          "sequence": null,
+          "actor_key": "bystander",
+          "target_key": null,
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 160,
+        "client_tick": 52,
+        "observed_at": "2026-09-04T12:00:01.200Z",
+        "elapsed_millis": 1200
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "boss",
+            "kind": "npc",
+            "display_name": "Generic boss",
+            "is_local_player": false,
+            "npc_id": 200,
+            "view_key": "view-main",
+            "world_x": 3212,
+            "world_y": 3210,
+            "scene_x": 12,
+            "scene_y": 10,
+            "local_x": 1600,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 2,
+            "orientation": 512,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": "player-1",
+            "dead": false,
+            "visible_equipment": null,
+            "overhead_icon": null
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "incoming-interaction",
+          "type": "interaction_change",
+          "game_cycle": 160,
+          "sequence": null,
+          "actor_key": "boss",
+          "target_key": "player-1",
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 190,
+        "client_tick": 53,
+        "observed_at": "2026-09-04T12:00:01.800Z",
+        "elapsed_millis": 1800
+      },
+      "actors": {
+        "upsert": [],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "incoming-projectile",
+          "type": "projectile",
+          "game_cycle": 190,
+          "sequence": null,
+          "actor_key": "boss",
+          "target_key": "player-1",
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": [],
+          "projectile_key": "projectile-1"
+        }
+      ],
+      "projectiles": {
+        "upsert": [
+          {
+            "key": "projectile-1",
+            "definition_id": 10,
+            "source_actor_key": "boss",
+            "target_actor_key": "player-1",
+            "source_point": null,
+            "target_point": null,
+            "start_cycle": 180,
+            "end_cycle": 220,
+            "remaining_cycles": 40,
+            "start_height": 0,
+            "end_height": 0,
+            "slope": 0,
+            "orientation": 0
+          }
+        ],
+        "remove": []
+      }
+    },
+    {
+      "index": 4,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 220,
+        "client_tick": 54,
+        "observed_at": "2026-09-04T12:00:02.400Z",
+        "elapsed_millis": 2400
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "add",
+            "kind": "npc",
+            "display_name": "Boss add",
+            "is_local_player": false,
+            "npc_id": 300,
+            "view_key": "view-main",
+            "world_x": 3213,
+            "world_y": 3210,
+            "scene_x": 13,
+            "scene_y": 10,
+            "local_x": 1728,
+            "local_y": 1344,
+            "plane": 0,
+            "size": 1,
+            "orientation": 512,
+            "animation_id": null,
+            "pose_animation_id": null,
+            "health_ratio": null,
+            "health_scale": null,
+            "target_key": null,
+            "dead": true,
+            "visible_equipment": null,
+            "overhead_icon": null
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "hit-add",
+          "type": "hitsplat",
+          "game_cycle": 220,
+          "sequence": null,
+          "actor_key": "add",
+          "target_key": null,
+          "definition_id": 1,
+          "amount": 0,
+          "location": null,
+          "detail": "mine",
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        },
+        {
+          "event_id": "death-add",
+          "type": "death",
+          "game_cycle": 221,
+          "sequence": null,
+          "actor_key": "add",
+          "target_key": null,
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        }
+      ],
+      "projectiles": {
+        "upsert": [],
+        "remove": [
+          "projectile-1"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 250,
+        "client_tick": 55,
+        "observed_at": "2026-09-04T12:00:03.000Z",
+        "elapsed_millis": 3000
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "boss",
+            "npc_id": 201,
+            "display_name": "Generic boss (changed form)"
+          }
+        ],
+        "remove": [
+          "add"
+        ]
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "transform-boss",
+          "type": "npc_transform",
+          "game_cycle": 250,
+          "sequence": null,
+          "actor_key": "boss",
+          "target_key": null,
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": [],
+          "from_definition_id": 200,
+          "to_definition_id": 201
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "keyframe": false,
+      "sync": {
+        "game_cycle": 280,
+        "client_tick": 56,
+        "observed_at": "2026-09-04T12:00:03.600Z",
+        "elapsed_millis": 3600
+      },
+      "actors": {
+        "upsert": [
+          {
+            "key": "boss",
+            "dead": true
+          }
+        ],
+        "remove": []
+      },
+      "scene": {
+        "upsert": [],
+        "remove": []
+      },
+      "container_changes": [],
+      "events": [
+        {
+          "event_id": "hit-boss",
+          "type": "hitsplat",
+          "game_cycle": 279,
+          "sequence": null,
+          "actor_key": "boss",
+          "target_key": null,
+          "definition_id": 1,
+          "amount": 8,
+          "location": null,
+          "detail": "mine",
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        },
+        {
+          "event_id": "death-boss",
+          "type": "death",
+          "game_cycle": 280,
+          "sequence": null,
+          "actor_key": "boss",
+          "target_key": null,
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "observed",
+          "rule_id": null,
+          "evidence_event_ids": []
+        },
+        {
+          "event_id": "kill-boss",
+          "type": "kill_attribution",
+          "game_cycle": 280,
+          "sequence": null,
+          "actor_key": "player-1",
+          "target_key": "boss",
+          "definition_id": null,
+          "amount": null,
+          "location": null,
+          "detail": null,
+          "evidence": "inferred",
+          "rule_id": "terminal_hitsplat_local_v1",
+          "evidence_event_ids": [
+            "hit-boss",
+            "death-boss"
+          ]
+        }
+      ]
+    }
+  ]
+}
