@@ -28,6 +28,16 @@ public interface CombatReplayConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "cra201Diagnostics",
+        name = "CRA-201 diagnostics",
+        description = "Save owner-local Gauntlet signal diagnostics beside recordings; these files are never uploaded"
+    )
+    default boolean cra201Diagnostics()
+    {
+        return false;
+    }
+
+    @ConfigItem(
         keyName = "deviceToken",
         name = "Device token",
         description = "Token issued by device pairing",

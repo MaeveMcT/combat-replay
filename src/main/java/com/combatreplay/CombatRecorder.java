@@ -119,6 +119,11 @@ final class CombatRecorder
 		return recording == null ? null : recording.snapshot();
 	}
 
+	String recordingId()
+	{
+		return recording == null ? null : recording.recordingId;
+	}
+
 	void addEvent(String type, Actor actor, Actor target, int id, int value,
 		LocalPoint location, String detail)
 	{

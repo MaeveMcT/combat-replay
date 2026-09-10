@@ -32,6 +32,7 @@ import net.runelite.api.events.DecorativeObjectDespawned;
 import net.runelite.api.events.DecorativeObjectSpawned;
 import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicChanged;
 import net.runelite.api.events.GraphicsObjectCreated;
@@ -51,6 +52,7 @@ import net.runelite.api.events.OverheadTextChanged;
 import net.runelite.api.events.PlayerDespawned;
 import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.ProjectileMoved;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WallObjectDespawned;
 import net.runelite.api.events.WallObjectSpawned;
 import net.runelite.api.coords.LocalPoint;
@@ -79,6 +81,7 @@ public class CombatReplayPlugin extends Plugin
 	@Inject private ClientToolbar clientToolbar;
 	@Inject private CombatReplayPanel panel;
 	@Inject private CombatRecorder recorder;
+	@Inject private GauntletSignalDiagnostics gauntletDiagnostics;
 	@Inject private RecordingStore store;
 	@Inject private ScheduledExecutorService executor;
 	@Inject private CombatReplayConfig config;
@@ -132,7 +135,8 @@ public class CombatReplayPlugin extends Plugin
 		closeUploadQueues();
 		if (recorder.isRecording())
 		{
-			save(recorder.stop(), false);
+			GauntletSignalDiagnostics.Snapshot diagnostics = gauntletDiagnostics.stop();
+			save(recorder.stop(), diagnostics, false);
 		}
 		panel.reset();
 		clientToolbar.removeNavigation(navigationButton);
@@ -172,9 +176,10 @@ public class CombatReplayPlugin extends Plugin
 	{
 		if (recorder.isRecording())
 		{
+			GauntletSignalDiagnostics.Snapshot diagnostics = gauntletDiagnostics.stop();
 			CombatRecording recording = recorder.stop();
 			panel.recordingSaving(recording);
-			save(recording, true);
+			save(recording, diagnostics, true);
 			return;
 		}
 		if (client.getGameState() != GameState.LOGGED_IN)
@@ -183,6 +188,10 @@ public class CombatReplayPlugin extends Plugin
 			return;
 		}
 		recorder.start();
+		if (config.cra201Diagnostics())
+		{
+			gauntletDiagnostics.start(recorder.recordingId());
+		}
 		panel.recordingStarted();
 	}
 
@@ -217,10 +226,12 @@ public class CombatReplayPlugin extends Plugin
 			});
 	}
 
-	private void save(CombatRecording recording, boolean updatePanel)
+	private void save(CombatRecording recording, GauntletSignalDiagnostics.Snapshot diagnostics,
+		boolean updatePanel)
 	{
 		if (recording == null || recording.ticks.isEmpty())
 		{
+			saveDiagnostics(diagnostics);
 			if (updatePanel)
 			{
 				panel.recordingStopped(recording, "Nothing was captured", false);
@@ -233,6 +244,7 @@ public class CombatReplayPlugin extends Plugin
 			{
 				Path path = store.save(recording);
 				log.debug("Saved combat recording to {}", path);
+				writeDiagnostics(diagnostics);
 				queueUpload(path, recording.recordingId);
 				if (updatePanel)
 				{
@@ -248,6 +260,25 @@ public class CombatReplayPlugin extends Plugin
 				}
 			}
 		});
+	}
+
+	private void saveDiagnostics(GauntletSignalDiagnostics.Snapshot diagnostics)
+	{
+		if (diagnostics != null) executor.execute(() -> writeDiagnostics(diagnostics));
+	}
+
+	private void writeDiagnostics(GauntletSignalDiagnostics.Snapshot diagnostics)
+	{
+		if (diagnostics == null) return;
+		try
+		{
+			diagnostics.save(store.directory());
+			log.debug("Saved owner-local CRA-201 diagnostics");
+		}
+		catch (IOException | RuntimeException exception)
+		{
+			log.warn("Unable to save CRA-201 diagnostics", exception);
+		}
 	}
 
 	private void queueUpload(Path path, String recordingId)
@@ -291,11 +322,24 @@ public class CombatReplayPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		gauntletDiagnostics.onGameTick();
 		recorder.captureTick();
 		if (recorder.isRecording())
 		{
 			panel.updateRecording(recorder.snapshot());
 		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		gauntletDiagnostics.onGameStateChanged(event.getGameState());
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		gauntletDiagnostics.onVarbitChanged(event);
 	}
 
 	@Subscribe
