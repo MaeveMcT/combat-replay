@@ -167,6 +167,51 @@ public class CombatRecorderV1Test
     }
 
     @Test
+    public void preservesLifecycleEvidenceOnManualTailStopWithoutLeakingIntoTheNextRecording()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
+        when(fixture.client.getVarbitValue(VarbitID.PLAYER_IN_GAUNTLET)).thenReturn(0, 1, 0);
+
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        fixture.recorder.captureActivitySignal(VarbitID.PLAYER_IN_GAUNTLET);
+        when(fixture.client.getTopLevelWorldView()).thenReturn(null);
+        fixture.recorder.captureObservationCoverage();
+        CombatRecording stopped = fixture.recorder.stop();
+
+        assertEquals(1, stopped.ticks.size());
+        assertTrue(stopped.ticks.get(0).events.stream().anyMatch(event -> event.activitySignal != null
+            && "change".equals(event.activitySignal.observation)
+            && Integer.valueOf(1).equals(event.activitySignal.value)));
+        assertTrue(stopped.ticks.get(0).events.stream().anyMatch(event -> event.observationCoverage != null
+            && !event.observationCoverage.available));
+
+        when(fixture.client.getTopLevelWorldView()).thenReturn(fixture.worldView);
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        CombatRecording restarted = fixture.recorder.stop();
+        assertFalse(restarted.ticks.get(0).events.stream().anyMatch(event -> event.observationCoverage != null
+            && !event.observationCoverage.available));
+    }
+
+    @Test
+    public void boundsRecordedEventsIncludingManualTailEvidence()
+    {
+        RecorderFixture fixture = new RecorderFixture();
+        fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
+        fixture.recorder.start();
+        fixture.recorder.captureTick();
+        for (int index = 0; index < 5000; index++)
+            fixture.recorder.addEvent("ANIMATION", fixture.local, null, index, 0, null, null);
+
+        CombatRecording stopped = fixture.recorder.stop();
+
+        assertEquals(4096, stopped.ticks.get(0).events.size());
+        ReplayV1SemanticValidator.validate(ReplayV1Format.encode(stopped));
+    }
+
+    @Test
     public void assignsUniqueStableIdsToCapturedAndDerivedEvents()
     {
         RecorderFixture fixture = new RecorderFixture();

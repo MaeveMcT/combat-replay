@@ -127,6 +127,7 @@ final class ReplayV1SemanticValidator
 				require(capabilities.contains(container), "Container data lacks a capability");
 			}
 			JsonArray events = tick.getAsJsonArray("events");
+			require(events.size() <= RecordedTick.MAX_EVENTS, "Tick event limit exceeded");
 			if (events.size() > 0) require(capabilities.contains("event_confidence"),
 				"Event confidence lacks a capability");
 			for (JsonElement element : events)
@@ -144,7 +145,11 @@ final class ReplayV1SemanticValidator
 				{
 					require(capabilities.contains("activity_signals"),
 						"Activity signal lacks a capability");
+					require(event.get("activity_signal").isJsonObject(), "Activity signal payload is malformed");
 					JsonObject signal = event.getAsJsonObject("activity_signal");
+					require(integerValue(signal, "varbit_id"), "Activity signal ID is malformed");
+					require(nullableIntegerValue(signal, "value"), "Activity signal value is malformed");
+					require(stringValue(signal, "observation"), "Activity signal observation is malformed");
 					require(ActivitySignalRegistry.CANDIDATE_VARBITS.contains(signal.get("varbit_id").getAsInt()),
 						"Activity signal is not allowlisted");
 					validateObservation(signal.get("observation").getAsString());
@@ -156,8 +161,12 @@ final class ReplayV1SemanticValidator
 				{
 					require(capabilities.contains("observation_coverage"),
 						"Observation coverage lacks a capability");
-					validateObservation(event.getAsJsonObject("observation_coverage")
-						.get("observation").getAsString());
+					require(event.get("observation_coverage").isJsonObject(),
+						"Observation coverage payload is malformed");
+					JsonObject coverage = event.getAsJsonObject("observation_coverage");
+					require(booleanValue(coverage, "available"), "Observation coverage value is malformed");
+					require(stringValue(coverage, "observation"), "Observation coverage kind is malformed");
+					validateObservation(coverage.get("observation").getAsString());
 				}
 				require(eventIds.add(eventId), "Duplicate event ID");
 				for (JsonElement reference : event.getAsJsonArray("evidence_event_ids"))
@@ -168,6 +177,39 @@ final class ReplayV1SemanticValidator
 			"Capture local actor was never observed");
 		for (String reference : evidenceReferences)
 			require(eventIds.contains(reference), "Evidence reference does not resolve");
+	}
+
+	private static boolean integerValue(JsonObject object, String property)
+	{
+		if (!object.has(property) || !object.get(property).isJsonPrimitive()
+			|| !object.getAsJsonPrimitive(property).isNumber()) return false;
+		try
+		{
+			object.getAsJsonPrimitive(property).getAsBigDecimal().intValueExact();
+			return true;
+		}
+		catch (ArithmeticException | NumberFormatException exception)
+		{
+			return false;
+		}
+	}
+
+	private static boolean nullableIntegerValue(JsonObject object, String property)
+	{
+		return object.has(property) && (object.get(property).isJsonNull()
+			|| integerValue(object, property));
+	}
+
+	private static boolean stringValue(JsonObject object, String property)
+	{
+		return object.has(property) && object.get(property).isJsonPrimitive()
+			&& object.getAsJsonPrimitive(property).isString();
+	}
+
+	private static boolean booleanValue(JsonObject object, String property)
+	{
+		return object.has(property) && object.get(property).isJsonPrimitive()
+			&& object.getAsJsonPrimitive(property).isBoolean();
 	}
 
 	private static void validateObservation(String observation)

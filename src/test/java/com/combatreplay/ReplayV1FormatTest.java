@@ -178,6 +178,42 @@ public class ReplayV1FormatTest
     }
 
     @Test
+    public void rejectsMalformedAndUnboundedLifecycleEvents() throws Exception
+    {
+        assertRejected(fixture ->
+        {
+            fixture.getAsJsonObject("capture").getAsJsonArray("capabilities").add("activity_signals");
+            fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                .getAsJsonArray("events").get(0).getAsJsonObject()
+                .addProperty("type", "activity_signal");
+        });
+        assertRejected(fixture ->
+        {
+            fixture.getAsJsonObject("capture").getAsJsonArray("capabilities").add("observation_coverage");
+            JsonObject event = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                .getAsJsonArray("events").get(0).getAsJsonObject();
+            JsonObject coverage = new JsonObject();
+            coverage.addProperty("available", "yes");
+            coverage.addProperty("observation", "initial");
+            event.addProperty("type", "observation_coverage");
+            event.add("observation_coverage", coverage);
+        });
+        assertRejected(fixture ->
+        {
+            JsonObject template = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                .getAsJsonArray("events").get(0).getAsJsonObject();
+            JsonArray events = new JsonArray();
+            for (int index = 0; index <= 4096; index++)
+            {
+                JsonObject event = template.deepCopy();
+                event.addProperty("event_id", "bounded-event-" + index);
+                events.add(event);
+            }
+            fixture.getAsJsonArray("ticks").get(0).getAsJsonObject().add("events", events);
+        });
+    }
+
+    @Test
     public void decodesDeterministicProjectileLifecycle() throws Exception
     {
         JsonObject fixture;
@@ -374,6 +410,15 @@ public class ReplayV1FormatTest
             Set<ValidationMessage> activityErrors = schema.validate(mapper.readTree(
                 getClass().getResourceAsStream("/replay-v1/valid/candidate-activity-signals.json")));
             assertTrue(activityErrors.toString(), activityErrors.isEmpty());
+
+            JsonObject oversized = fixture();
+            JsonObject template = oversized.getAsJsonArray("ticks").get(0).getAsJsonObject()
+                .getAsJsonArray("events").get(0).getAsJsonObject();
+            JsonArray events = new JsonArray();
+            for (int index = 0; index <= 4096; index++) events.add(template.deepCopy());
+            oversized.getAsJsonArray("ticks").get(0).getAsJsonObject().add("events", events);
+            Set<ValidationMessage> oversizedErrors = schema.validate(mapper.readTree(oversized.toString()));
+            assertFalse(oversizedErrors.toString(), oversizedErrors.isEmpty());
         }
     }
 

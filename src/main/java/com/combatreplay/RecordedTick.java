@@ -6,6 +6,8 @@ import java.util.List;
 
 final class RecordedTick
 {
+	static final int MAX_EVENTS = 4096;
+
 	final int tick;
 	final int gameCycle;
 	final int clientTick;
@@ -165,7 +167,9 @@ final class RecordedTick
 		List<ContainerSnapshot> mergedContainers = new ArrayList<>(containerChanges);
 		mergedContainers.addAll(additionalContainers);
 		List<RecordedEvent> mergedEvents = new ArrayList<>(events);
-		mergedEvents.addAll(additionalEvents);
+		int remainingEvents = Math.max(0, MAX_EVENTS - mergedEvents.size());
+		mergedEvents.addAll(additionalEvents.subList(0,
+			Math.min(remainingEvents, additionalEvents.size())));
 		return new RecordedTick(tick, gameCycle, clientTick, observedAtEpochMillis, elapsedMillis,
 			world, viewKey, instanceTemplateChunks, contextPlane, baseX, baseY, instanced, hitpoints,
 			maximumHitpoints, prayer, maximumPrayer, actors, inventory, equipment,

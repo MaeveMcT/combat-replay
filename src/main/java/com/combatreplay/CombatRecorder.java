@@ -146,7 +146,7 @@ final class CombatRecorder
 		RecordedEvent observed = observedEvent(type, keyFor(actor), keyFor(target), id, value,
 			location == null ? -1 : location.getSceneX(),
 			location == null ? -1 : location.getSceneY(), detail);
-		pendingEvents.add(observed);
+		if (!queueEvent(observed)) return;
 		killAttribution.observe(observed);
 		if ("DEATH".equals(type))
 		{
@@ -154,7 +154,7 @@ final class CombatRecorder
 				keyFor(client.getLocalPlayer()));
 			if (attribution != null)
 			{
-				pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "KILL_ATTRIBUTION",
+				queueEvent(new RecordedEvent("event-" + nextEventId++, "KILL_ATTRIBUTION",
 					observed.gameCycle, null, attribution.killerKey, observed.actorKey,
 					null, null, null, null, -1, -1, null, null, "inferred",
 					attribution.ruleId, attribution.evidenceEventIds));
@@ -166,7 +166,7 @@ final class CombatRecorder
 		String menuAction, Integer itemId, Integer widgetId, Integer objectId, LocalPoint location)
 	{
 		if (!isRecording()) return;
-		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "ACTION_ATTEMPT",
+		queueEvent(new RecordedEvent("event-" + nextEventId++, "ACTION_ATTEMPT",
 			client.getGameCycle(), null, keyFor(client.getLocalPlayer()), keyFor(target), null,
 			null, null, null, null, null, null,
 			location == null ? -1 : location.getSceneX(), location == null ? -1 : location.getSceneY(),
@@ -207,8 +207,7 @@ final class CombatRecorder
 			location == null ? -1 : location.getSceneX(), location == null ? -1 : location.getSceneY(),
 			location == null ? null : "scene", null, "observed", null,
 			java.util.Collections.emptyList());
-		pendingEvents.add(event);
-		killAttribution.observe(event);
+		if (queueEvent(event)) killAttribution.observe(event);
 	}
 
 	void upsertGroundItem(Tile tile, TileItem item, int quantity)
@@ -236,7 +235,7 @@ final class CombatRecorder
 		recordNpcDefinition(oldComposition);
 		recordNpcDefinition(current);
 		LocalPoint location = npc.getLocalLocation();
-		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "NPC_CHANGED",
+		queueEvent(new RecordedEvent("event-" + nextEventId++, "NPC_CHANGED",
 			client.getGameCycle(), null, keyFor(npc), null, toId, null, fromId, toId,
 			null, null, null, location == null ? -1 : location.getSceneX(),
 			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
@@ -253,7 +252,7 @@ final class CombatRecorder
 		ObjectObservation observation = new ObjectObservation(category,
 			metadata == null ? null : metadata.effectiveDefinitionId, orientation, configuration,
 			metadata == null ? null : metadata.sizeX, metadata == null ? null : metadata.sizeY);
-		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, type, client.getGameCycle(),
+		queueEvent(new RecordedEvent("event-" + nextEventId++, type, client.getGameCycle(),
 			null, null, null, object.getId(), null, null, null, null, null,
 			object.getPlane(), location == null ? -1 : location.getSceneX(),
 			location == null ? -1 : location.getSceneY(), location == null ? null : "scene",
@@ -357,7 +356,7 @@ final class CombatRecorder
 		if (!includeEqual && previousObservationCoverage != null
 			&& previousObservationCoverage.booleanValue() == available) return;
 		previousObservationCoverage = available;
-		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "OBSERVATION_COVERAGE",
+		queueEvent(new RecordedEvent("event-" + nextEventId++, "OBSERVATION_COVERAGE",
 			client.getGameCycle(), lifecycleSequence++, null, null, null, null, null, null,
 			null, null, null, -1, -1, null, null, "observed", null,
 			Collections.emptyList(), null, null, null, null, null, null, null, null, null,
@@ -376,7 +375,7 @@ final class CombatRecorder
 
 	private void recordActivitySignal(int varbitId, int value, String observation)
 	{
-		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "ACTIVITY_SIGNAL",
+		queueEvent(new RecordedEvent("event-" + nextEventId++, "ACTIVITY_SIGNAL",
 			client.getGameCycle(), lifecycleSequence++, null, null, null, null, null, null,
 			null, null, null, -1, -1, null, null, "observed", null,
 			Collections.emptyList(), null, null, null, null, null, null, null, null,
@@ -395,6 +394,13 @@ final class CombatRecorder
 			client.getVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED) == 1);
 	}
 
+	private boolean queueEvent(RecordedEvent event)
+	{
+		if (pendingEvents.size() >= RecordedTick.MAX_EVENTS) return false;
+		pendingEvents.add(event);
+		return true;
+	}
+
 	private RecordedEvent observedEvent(String type, String actorKey, String targetKey,
 		int id, int value, int sceneX, int sceneY, String detail)
 	{
@@ -409,7 +415,7 @@ final class CombatRecorder
 	{
 		if (previous >= 0 && current != previous)
 		{
-			pendingEvents.add(observedEvent("RESOURCE_CHANGE", keyFor(client.getLocalPlayer()),
+			queueEvent(observedEvent("RESOURCE_CHANGE", keyFor(client.getLocalPlayer()),
 				null, 0, current - previous, -1, -1, resource));
 		}
 	}
@@ -433,7 +439,7 @@ final class CombatRecorder
 		{
 			if (!previousPrayers.contains(prayer))
 			{
-				pendingEvents.add(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
+				queueEvent(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
 					null, 0, 1, -1, -1, prayer));
 			}
 		}
@@ -441,7 +447,7 @@ final class CombatRecorder
 		{
 			if (!current.contains(prayer))
 			{
-				pendingEvents.add(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
+				queueEvent(observedEvent("PRAYER_CHANGE", keyFor(client.getLocalPlayer()),
 					null, 0, 0, -1, -1, prayer));
 			}
 		}
