@@ -6,7 +6,7 @@ import java.util.List;
 
 final class RecordedTick
 {
-	static final int MAX_EVENTS = 4096;
+	static final int MAX_EVENTS = 16384;
 
 	final int tick;
 	final int gameCycle;

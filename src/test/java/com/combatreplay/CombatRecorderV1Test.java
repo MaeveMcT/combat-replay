@@ -202,12 +202,12 @@ public class CombatRecorderV1Test
         fixture.withActors(Collections.singletonList(fixture.local), Collections.emptyList());
         fixture.recorder.start();
         fixture.recorder.captureTick();
-        for (int index = 0; index < 5000; index++)
+        for (int index = 0; index < RecordedTick.MAX_EVENTS + 100; index++)
             fixture.recorder.addEvent("ANIMATION", fixture.local, null, index, 0, null, null);
 
         CombatRecording stopped = fixture.recorder.stop();
 
-        assertEquals(4096, stopped.ticks.get(0).events.size());
+        assertEquals(RecordedTick.MAX_EVENTS, stopped.ticks.get(0).events.size());
         ReplayV1SemanticValidator.validate(ReplayV1Format.encode(stopped));
     }
 

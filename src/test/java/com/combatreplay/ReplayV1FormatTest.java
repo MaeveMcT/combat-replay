@@ -203,7 +203,7 @@ public class ReplayV1FormatTest
             JsonObject template = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
                 .getAsJsonArray("events").get(0).getAsJsonObject();
             JsonArray events = new JsonArray();
-            for (int index = 0; index <= 4096; index++)
+            for (int index = 0; index <= RecordedTick.MAX_EVENTS; index++)
             {
                 JsonObject event = template.deepCopy();
                 event.addProperty("event_id", "bounded-event-" + index);
@@ -415,7 +415,7 @@ public class ReplayV1FormatTest
             JsonObject template = oversized.getAsJsonArray("ticks").get(0).getAsJsonObject()
                 .getAsJsonArray("events").get(0).getAsJsonObject();
             JsonArray events = new JsonArray();
-            for (int index = 0; index <= 4096; index++) events.add(template.deepCopy());
+            for (int index = 0; index <= RecordedTick.MAX_EVENTS; index++) events.add(template.deepCopy());
             oversized.getAsJsonArray("ticks").get(0).getAsJsonObject().add("events", events);
             Set<ValidationMessage> oversizedErrors = schema.validate(mapper.readTree(oversized.toString()));
             assertFalse(oversizedErrors.toString(), oversizedErrors.isEmpty());
