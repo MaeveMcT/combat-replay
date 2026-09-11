@@ -34,7 +34,7 @@ public interface CombatReplayConfig extends Config
     )
     default boolean cra201Diagnostics()
     {
-        return false;
+        return true;
     }
 
     @ConfigItem(
