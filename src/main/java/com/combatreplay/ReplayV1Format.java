@@ -55,12 +55,7 @@ final class ReplayV1Format
         if (initialWorld == null) capture.add("initial_world", JsonNull.INSTANCE);
         else capture.addProperty("initial_world", initialWorld);
         JsonArray capabilities = new JsonArray();
-        for (String capability : new String[]{
-            "player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
-            "inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
-            "npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats",
-            "actor_movement_animations", "ground_items", "action_attempts"
-        })
+        for (String capability : recording.capabilities)
         {
             capabilities.add(capability);
         }
@@ -457,6 +452,21 @@ final class ReplayV1Format
             addNullableInteger(value, "size_x", event.objectObservation.sizeX);
             addNullableInteger(value, "size_y", event.objectObservation.sizeY);
         }
+        if (event.activitySignal != null)
+        {
+            JsonObject signal = new JsonObject();
+            signal.addProperty("varbit_id", event.activitySignal.varbitId);
+            addNullableInteger(signal, "value", event.activitySignal.value);
+            signal.addProperty("observation", event.activitySignal.observation);
+            value.add("activity_signal", signal);
+        }
+        if (event.observationCoverage != null)
+        {
+            JsonObject coverage = new JsonObject();
+            coverage.addProperty("available", event.observationCoverage.available);
+            coverage.addProperty("observation", event.observationCoverage.observation);
+            value.add("observation_coverage", coverage);
+        }
         if (event.sceneX < 0 || event.sceneY < 0)
         {
             value.add("location", JsonNull.INSTANCE);
@@ -566,6 +576,7 @@ final class ReplayV1Format
             throw new IllegalArgumentException("Unsupported combat recording format");
         }
         ReplayV1SemanticValidator.validate(root);
+        List<String> capabilities = strings(root.getAsJsonObject("capture").get("capabilities"));
         JsonObject dictionaries = root.getAsJsonObject("dictionaries");
         Map<Integer, String> itemNames = itemNames(dictionaries);
         Map<Integer, NpcDefinitionMetadata> npcDefinitions = npcDefinitions(dictionaries);
@@ -711,7 +722,7 @@ final class ReplayV1Format
             nullableInteger(producer, "game_revision", null),
             Instant.parse(root.get("started_at").getAsString()).toEpochMilli(),
             Instant.parse(root.get("ended_at").getAsString()).toEpochMilli(),
-            root.get("name").getAsString(), ticks, npcDefinitions, objectDefinitions);
+            root.get("name").getAsString(), capabilities, ticks, npcDefinitions, objectDefinitions);
     }
 
     private static void requireCompleteActor(JsonObject actor)
@@ -803,6 +814,22 @@ final class ReplayV1Format
             nullableInteger(value, "size_x", null), nullableInteger(value, "size_y", null));
     }
 
+    private static ActivitySignalObservation decodeActivitySignal(JsonObject value)
+    {
+        JsonObject signal = object(value, "activity_signal");
+        if (signal == null) return null;
+        return new ActivitySignalObservation(signal.get("varbit_id").getAsInt(),
+            nullableInteger(signal, "value", null), signal.get("observation").getAsString());
+    }
+
+    private static ObservationCoverage decodeObservationCoverage(JsonObject value)
+    {
+        JsonObject coverage = object(value, "observation_coverage");
+        if (coverage == null) return null;
+        return new ObservationCoverage(coverage.get("available").getAsBoolean(),
+            coverage.get("observation").getAsString());
+    }
+
     private static LocalCombatState decodeCombatState(JsonObject local, LocalCombatState previous)
     {
         JsonObject stats = local.getAsJsonObject("combat_stats");
@@ -881,7 +908,8 @@ final class ReplayV1Format
                 nullableString(value, "action_kind", null), nullableString(value, "menu_option", null),
                 nullableString(value, "menu_target", null), nullableString(value, "menu_action", null),
                 nullableInteger(value, "item_id", null), nullableInteger(value, "widget_id", null),
-                nullableInteger(value, "object_id", null), decodeObjectObservation(value)));
+                nullableInteger(value, "object_id", null), decodeObjectObservation(value),
+                decodeActivitySignal(value), decodeObservationCoverage(value)));
         }
         return result;
     }

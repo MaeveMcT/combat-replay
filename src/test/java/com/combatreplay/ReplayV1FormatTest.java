@@ -1,6 +1,7 @@
 package com.combatreplay;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -111,6 +112,72 @@ public class ReplayV1FormatTest
     }
 
     @Test
+    public void preservesDeclaredCapabilitiesAcrossDecodeAndEncode() throws Exception
+    {
+        JsonObject fixture = fixture();
+        JsonArray declared = fixture.getAsJsonObject("capture").getAsJsonArray("capabilities");
+        declared.add("future_activity_observations");
+
+        JsonArray roundTripped = ReplayV1Format.encode(ReplayV1Format.decode(fixture))
+            .getAsJsonObject("capture").getAsJsonArray("capabilities");
+
+        assertEquals(declared, roundTripped);
+    }
+
+    @Test
+    public void preservesNeutralActivitySignalObservationsAcrossDecodeAndEncode() throws Exception
+    {
+        JsonObject fixture = fixture();
+        fixture.getAsJsonObject("capture").getAsJsonArray("capabilities").add("activity_signals");
+        JsonObject signal = new JsonObject();
+        signal.addProperty("varbit_id", 9177);
+        signal.add("value", com.google.gson.JsonNull.INSTANCE);
+        signal.addProperty("observation", "initial");
+        JsonObject event = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").get(0).getAsJsonObject();
+        event.addProperty("type", "activity_signal");
+        event.add("activity_signal", signal);
+
+        JsonObject roundTrippedEvent = ReplayV1Format.encode(ReplayV1Format.decode(fixture))
+            .getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").get(0).getAsJsonObject();
+
+        assertEquals(signal, roundTrippedEvent.getAsJsonObject("activity_signal"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsActivitySignalObservationWithoutCapability() throws Exception
+    {
+        JsonObject fixture = fixture();
+        JsonObject signal = new JsonObject();
+        signal.addProperty("varbit_id", 9177);
+        signal.addProperty("value", 0);
+        signal.addProperty("observation", "initial");
+        JsonObject event = fixture.getAsJsonArray("ticks").get(0).getAsJsonObject()
+            .getAsJsonArray("events").get(0).getAsJsonObject();
+        event.addProperty("type", "activity_signal");
+        event.add("activity_signal", signal);
+
+        ReplayV1Format.decode(fixture);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsActivitySignalOutsideCandidateAllowlist() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/candidate-activity-signals.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+        fixture.getAsJsonArray("ticks").get(0).getAsJsonObject().getAsJsonArray("events")
+            .get(2).getAsJsonObject().getAsJsonObject("activity_signal")
+            .addProperty("varbit_id", 9179);
+
+        ReplayV1Format.decode(fixture);
+    }
+
+    @Test
     public void decodesDeterministicProjectileLifecycle() throws Exception
     {
         JsonObject fixture;
@@ -161,6 +228,39 @@ public class ReplayV1FormatTest
         assertEquals(Integer.valueOf(200), recording.ticks.get(5).events.get(0).fromDefinitionId);
         assertEquals("mine", recording.ticks.get(6).events.get(0).detail);
         assertEquals("terminal_hitsplat_local_v1", recording.ticks.get(6).events.get(2).ruleId);
+    }
+
+    @Test
+    public void roundTripsOrderedNeutralActivitySignalFixture() throws Exception
+    {
+        JsonObject fixture;
+        try (Reader reader = new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/replay-v1/valid/candidate-activity-signals.json")))
+        {
+            fixture = new JsonParser().parse(reader).getAsJsonObject();
+        }
+
+        CombatRecording recording = ReplayV1Format.decode(fixture);
+        ActivitySignalObservation initial = recording.ticks.get(0).events.stream()
+            .filter(event -> event.activitySignal != null).findFirst().get().activitySignal;
+        assertEquals(9177, initial.varbitId);
+        assertNull(initial.value);
+        assertEquals("initial", initial.observation);
+        java.util.List<RecordedEvent> changes = new java.util.ArrayList<>();
+        for (RecordedEvent event : recording.ticks.get(1).events)
+            if (event.activitySignal != null) changes.add(event);
+        assertEquals(Integer.valueOf(1), changes.get(0).activitySignal.value);
+        assertEquals(Integer.valueOf(0), changes.get(1).activitySignal.value);
+        assertEquals(Integer.valueOf(0), changes.get(2).activitySignal.value);
+        assertFalse(recording.ticks.get(1).events.get(1).observationCoverage.available);
+        assertTrue(recording.ticks.get(1).events.get(4).observationCoverage.available);
+        assertEquals(125, recording.ticks.get(2).events.get(4).gameCycle);
+
+        JsonObject roundTripped = ReplayV1Format.encode(recording);
+        assertEquals(fixture.getAsJsonObject("capture").getAsJsonArray("capabilities"),
+            roundTripped.getAsJsonObject("capture").getAsJsonArray("capabilities"));
+        assertEquals(fixture.getAsJsonArray("ticks").get(1).getAsJsonObject().getAsJsonArray("events"),
+            roundTripped.getAsJsonArray("ticks").get(1).getAsJsonObject().getAsJsonArray("events"));
     }
 
     @Test
@@ -271,6 +371,9 @@ public class ReplayV1FormatTest
             Set<ValidationMessage> fightErrors = schema.validate(mapper.readTree(
                 getClass().getResourceAsStream("/replay-v1/valid/generic-fights.json")));
             assertTrue(fightErrors.toString(), fightErrors.isEmpty());
+            Set<ValidationMessage> activityErrors = schema.validate(mapper.readTree(
+                getClass().getResourceAsStream("/replay-v1/valid/candidate-activity-signals.json")));
+            assertTrue(activityErrors.toString(), activityErrors.isEmpty());
         }
     }
 

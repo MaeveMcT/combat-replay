@@ -43,7 +43,10 @@ final class CombatRecorder
 	private final List<RecordedEvent> pendingEvents = new ArrayList<>();
 	private final List<ContainerSnapshot> pendingContainerChanges = new ArrayList<>();
 	private final Map<String, String> recordedTiles = new HashMap<>();
+	private static final int LIFECYCLE_RESYNC_TICKS = 10;
+
 	private final Set<String> previousPrayers = new HashSet<>();
+	private final Map<Integer, Integer> previousActivitySignals = new HashMap<>();
 	private final KillAttributionTracker killAttribution = new KillAttributionTracker();
 	private final ProjectileTracker projectiles = new ProjectileTracker();
 	private final GroundItemTracker groundItems = new GroundItemTracker();
@@ -52,6 +55,9 @@ final class CombatRecorder
 	private int nextEventId;
 	private int previousHitpoints = -1;
 	private int previousPrayer = -1;
+	private int lifecycleSequence;
+	private int ticksSinceLifecycleResync;
+	private Boolean previousObservationCoverage;
 	private long recordingStartedNanos;
 
 	CombatRecorder(Client client)
@@ -87,6 +93,12 @@ final class CombatRecorder
 		nextEventId = 1;
 		previousHitpoints = -1;
 		previousPrayer = -1;
+		lifecycleSequence = 0;
+		ticksSinceLifecycleResync = 0;
+		previousObservationCoverage = null;
+		previousActivitySignals.clear();
+		recordObservationCoverage("initial", true);
+		recordActivitySignals("initial");
 	}
 
 	CombatRecording stop()
@@ -161,6 +173,23 @@ final class CombatRecorder
 			location == null ? null : "scene", null, "observed", null,
 			java.util.Collections.emptyList(), actionKind, option, menuTarget, menuAction,
 			itemId, widgetId, objectId, null));
+	}
+
+	void captureObservationCoverage()
+	{
+		if (!isRecording()) return;
+		recordObservationCoverage("change", false);
+	}
+
+	void captureActivitySignal(int varbitId)
+	{
+		if (!isRecording() || !ActivitySignalRegistry.CANDIDATE_VARBITS.contains(varbitId)) return;
+		int value = client.getVarbitValue(varbitId);
+		Integer previous = previousActivitySignals.put(varbitId, value);
+		if (previous == null || previous.intValue() != value)
+		{
+			recordActivitySignal(varbitId, value, "change");
+		}
 	}
 
 	void captureProjectile(Projectile projectile, LocalPoint movedTo)
@@ -267,6 +296,14 @@ final class CombatRecorder
 		{
 			return;
 		}
+		recordObservationCoverage("change", false);
+		ticksSinceLifecycleResync++;
+		if (ticksSinceLifecycleResync >= LIFECYCLE_RESYNC_TICKS)
+		{
+			recordObservationCoverage("resync", true);
+			recordActivitySignals("resync");
+			ticksSinceLifecycleResync = 0;
+		}
 		WorldView worldView = client.getTopLevelWorldView();
 		if (worldView == null)
 		{
@@ -312,6 +349,38 @@ final class CombatRecorder
 			groundItemDelta.upserts, groundItemDelta.removals));
 		pendingEvents.clear();
 		pendingContainerChanges.clear();
+	}
+
+	private void recordObservationCoverage(String observation, boolean includeEqual)
+	{
+		boolean available = client.getTopLevelWorldView() != null;
+		if (!includeEqual && previousObservationCoverage != null
+			&& previousObservationCoverage.booleanValue() == available) return;
+		previousObservationCoverage = available;
+		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "OBSERVATION_COVERAGE",
+			client.getGameCycle(), lifecycleSequence++, null, null, null, null, null, null,
+			null, null, null, -1, -1, null, null, "observed", null,
+			Collections.emptyList(), null, null, null, null, null, null, null, null, null,
+			new ObservationCoverage(available, observation)));
+	}
+
+	private void recordActivitySignals(String observation)
+	{
+		for (int varbitId : ActivitySignalRegistry.CANDIDATE_VARBITS_IN_ORDER)
+		{
+			int value = client.getVarbitValue(varbitId);
+			previousActivitySignals.put(varbitId, value);
+			recordActivitySignal(varbitId, value, observation);
+		}
+	}
+
+	private void recordActivitySignal(int varbitId, int value, String observation)
+	{
+		pendingEvents.add(new RecordedEvent("event-" + nextEventId++, "ACTIVITY_SIGNAL",
+			client.getGameCycle(), lifecycleSequence++, null, null, null, null, null, null,
+			null, null, null, -1, -1, null, null, "observed", null,
+			Collections.emptyList(), null, null, null, null, null, null, null, null,
+			new ActivitySignalObservation(varbitId, value, observation)));
 	}
 
 	private LocalCombatState captureCombatState()

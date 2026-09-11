@@ -34,6 +34,8 @@ final class RecordedEvent
 	final Integer widgetId;
 	final Integer objectId;
 	final ObjectObservation objectObservation;
+	final ActivitySignalObservation activitySignal;
+	final ObservationCoverage observationCoverage;
 
 	RecordedEvent(String type, int gameCycle, String actorKey, String targetKey,
 		int id, int value, int sceneX, int sceneY, String detail)
@@ -73,6 +75,35 @@ final class RecordedEvent
 		String menuAction, Integer itemId, Integer widgetId, Integer objectId,
 		ObjectObservation objectObservation)
 	{
+		this(eventId, type, gameCycle, sequence, actorKey, targetKey, id, value,
+			fromDefinitionId, toDefinitionId, projectileKey, viewKey, plane, sceneX, sceneY,
+			coordinateSpace, detail, evidence, ruleId, evidenceEventIds, actionKind, menuOption,
+			menuTarget, menuAction, itemId, widgetId, objectId, objectObservation, null);
+	}
+
+	RecordedEvent(String eventId, String type, int gameCycle, Integer sequence,
+		String actorKey, String targetKey, Integer id, Integer value, Integer fromDefinitionId,
+		Integer toDefinitionId, String projectileKey, String viewKey, Integer plane, int sceneX, int sceneY,
+		String coordinateSpace, String detail, String evidence, String ruleId,
+		List<String> evidenceEventIds, String actionKind, String menuOption, String menuTarget,
+		String menuAction, Integer itemId, Integer widgetId, Integer objectId,
+		ObjectObservation objectObservation, ActivitySignalObservation activitySignal)
+	{
+		this(eventId, type, gameCycle, sequence, actorKey, targetKey, id, value,
+			fromDefinitionId, toDefinitionId, projectileKey, viewKey, plane, sceneX, sceneY,
+			coordinateSpace, detail, evidence, ruleId, evidenceEventIds, actionKind, menuOption,
+			menuTarget, menuAction, itemId, widgetId, objectId, objectObservation, activitySignal, null);
+	}
+
+	RecordedEvent(String eventId, String type, int gameCycle, Integer sequence,
+		String actorKey, String targetKey, Integer id, Integer value, Integer fromDefinitionId,
+		Integer toDefinitionId, String projectileKey, String viewKey, Integer plane, int sceneX, int sceneY,
+		String coordinateSpace, String detail, String evidence, String ruleId,
+		List<String> evidenceEventIds, String actionKind, String menuOption, String menuTarget,
+		String menuAction, Integer itemId, Integer widgetId, Integer objectId,
+		ObjectObservation objectObservation, ActivitySignalObservation activitySignal,
+		ObservationCoverage observationCoverage)
+	{
 		this.eventId = eventId;
 		this.type = type;
 		this.gameCycle = gameCycle;
@@ -101,6 +132,8 @@ final class RecordedEvent
 		this.widgetId = widgetId;
 		this.objectId = objectId;
 		this.objectObservation = objectObservation;
+		this.activitySignal = activitySignal;
+		this.observationCoverage = observationCoverage;
 	}
 
 	static boolean usesDefinitionId(String type)

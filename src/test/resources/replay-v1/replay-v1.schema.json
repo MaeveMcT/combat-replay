@@ -737,6 +737,70 @@
     "event": {
       "type": "object",
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "activity_signal"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "activity_signal"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "activity_signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "activity_signal"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "observation_coverage"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "observation_coverage"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "observation_coverage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "observation_coverage"
+              }
+            }
+          }
+        }
+      ],
       "required": [
         "event_id",
         "type",
@@ -890,6 +954,12 @@
         "object_id": {
           "$ref": "#/$defs/nullableInteger"
         },
+        "activity_signal": {
+          "$ref": "#/$defs/activitySignal"
+        },
+        "observation_coverage": {
+          "$ref": "#/$defs/observationCoverage"
+        },
         "object_category": {
           "type": [
             "string",
@@ -927,6 +997,57 @@
           ],
           "minimum": 1,
           "maximum": 64
+        }
+      }
+    },
+    "activitySignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "varbit_id",
+        "value",
+        "observation"
+      ],
+      "properties": {
+        "varbit_id": {
+          "type": "integer",
+          "enum": [
+            9177,
+            9178,
+            9292
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "observation": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "change",
+            "resync"
+          ]
+        }
+      }
+    },
+    "observationCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available",
+        "observation"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "observation": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "change",
+            "resync"
+          ]
         }
       }
     },

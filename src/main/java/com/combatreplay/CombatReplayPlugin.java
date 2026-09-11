@@ -334,12 +334,14 @@ public class CombatReplayPlugin extends Plugin
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		gauntletDiagnostics.onGameStateChanged(event.getGameState());
+		recorder.captureObservationCoverage();
 	}
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
 		gauntletDiagnostics.onVarbitChanged(event);
+		recorder.captureActivitySignal(event.getVarbitId());
 	}
 
 	@Subscribe

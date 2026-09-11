@@ -137,6 +137,28 @@ final class ReplayV1SemanticValidator
 					"Projectile key lacks a capability");
 				if (event.has("action_kind")) require(capabilities.contains("action_attempts"),
 					"Action attempt lacks a capability");
+				boolean activitySignalType = "activity_signal".equals(event.get("type").getAsString());
+				require(activitySignalType == event.has("activity_signal"),
+					"Activity signal payload and type must match");
+				if (activitySignalType)
+				{
+					require(capabilities.contains("activity_signals"),
+						"Activity signal lacks a capability");
+					JsonObject signal = event.getAsJsonObject("activity_signal");
+					require(ActivitySignalRegistry.CANDIDATE_VARBITS.contains(signal.get("varbit_id").getAsInt()),
+						"Activity signal is not allowlisted");
+					validateObservation(signal.get("observation").getAsString());
+				}
+				boolean coverageType = "observation_coverage".equals(event.get("type").getAsString());
+				require(coverageType == event.has("observation_coverage"),
+					"Observation coverage payload and type must match");
+				if (coverageType)
+				{
+					require(capabilities.contains("observation_coverage"),
+						"Observation coverage lacks a capability");
+					validateObservation(event.getAsJsonObject("observation_coverage")
+						.get("observation").getAsString());
+				}
 				require(eventIds.add(eventId), "Duplicate event ID");
 				for (JsonElement reference : event.getAsJsonArray("evidence_event_ids"))
 					evidenceReferences.add(reference.getAsString());
@@ -146,6 +168,12 @@ final class ReplayV1SemanticValidator
 			"Capture local actor was never observed");
 		for (String reference : evidenceReferences)
 			require(eventIds.contains(reference), "Evidence reference does not resolve");
+	}
+
+	private static void validateObservation(String observation)
+	{
+		require("initial".equals(observation) || "change".equals(observation)
+			|| "resync".equals(observation), "Observation kind is invalid");
 	}
 
 	private static void validateScene(JsonObject operations, Set<String> capabilities)

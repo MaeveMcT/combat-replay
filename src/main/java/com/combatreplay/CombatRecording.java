@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -13,6 +14,12 @@ import java.util.UUID;
 final class CombatRecording
 {
 	static final int FORMAT_VERSION = 1;
+	static final List<String> DEFAULT_CAPABILITIES = Collections.unmodifiableList(Arrays.asList(
+		"player_names", "actor_local_coordinates", "scene_tiles", "instance_templates",
+		"inventory", "equipment", "active_prayers", "container_changes", "event_confidence",
+		"npc_definitions", "object_definitions", "projectile_lifecycle", "local_combat_stats",
+		"actor_movement_animations", "ground_items", "action_attempts", "activity_signals",
+		"observation_coverage"));
 	private static final DateTimeFormatter NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 		.withZone(ZoneId.systemDefault());
 
@@ -24,6 +31,7 @@ final class CombatRecording
 	final long startedAtEpochMillis;
 	final long endedAtEpochMillis;
 	final String name;
+	final List<String> capabilities;
 	final List<RecordedTick> ticks;
 	final Map<Integer, NpcDefinitionMetadata> npcDefinitions;
 	final Map<Integer, ObjectDefinitionMetadata> objectDefinitions;
@@ -37,13 +45,13 @@ final class CombatRecording
 		Integer gameRevision)
 	{
 		this(FORMAT_VERSION, UUID.randomUUID().toString(), pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, 0L, null, new ArrayList<>(),
-			new HashMap<>(), new HashMap<>());
+			gameRevision, startedAtEpochMillis, 0L, null, DEFAULT_CAPABILITIES,
+			new ArrayList<>(), new HashMap<>(), new HashMap<>());
 	}
 
 	private CombatRecording(int formatVersion, String recordingId, String pluginVersion,
 		String runeLiteVersion, Integer gameRevision, long startedAtEpochMillis,
-		long endedAtEpochMillis, String name, List<RecordedTick> ticks,
+		long endedAtEpochMillis, String name, List<String> capabilities, List<RecordedTick> ticks,
 		Map<Integer, NpcDefinitionMetadata> npcDefinitions,
 		Map<Integer, ObjectDefinitionMetadata> objectDefinitions)
 	{
@@ -55,6 +63,7 @@ final class CombatRecording
 		this.startedAtEpochMillis = startedAtEpochMillis;
 		this.endedAtEpochMillis = endedAtEpochMillis;
 		this.name = name;
+		this.capabilities = capabilities;
 		this.ticks = ticks;
 		this.npcDefinitions = npcDefinitions;
 		this.objectDefinitions = objectDefinitions;
@@ -102,7 +111,7 @@ final class CombatRecording
 	private CombatRecording copy(long endedAt, String copiedName)
 	{
 		return new CombatRecording(formatVersion, recordingId, pluginVersion, runeLiteVersion,
-			gameRevision, startedAtEpochMillis, endedAt, copiedName,
+			gameRevision, startedAtEpochMillis, endedAt, copiedName, capabilities,
 			Collections.unmodifiableList(new ArrayList<>(ticks)),
 			Collections.unmodifiableMap(new HashMap<>(npcDefinitions)),
 			Collections.unmodifiableMap(new HashMap<>(objectDefinitions)));
@@ -148,7 +157,7 @@ final class CombatRecording
 		Integer gameRevision, long startedAt, long endedAt, String name, List<RecordedTick> ticks)
 	{
 		return restored(recordingId, pluginVersion, runeLiteVersion, gameRevision, startedAt,
-			endedAt, name, ticks, Collections.emptyMap(), Collections.emptyMap());
+			endedAt, name, DEFAULT_CAPABILITIES, ticks, Collections.emptyMap(), Collections.emptyMap());
 	}
 
 	static CombatRecording restored(String recordingId, String pluginVersion, String runeLiteVersion,
@@ -156,8 +165,18 @@ final class CombatRecording
 		Map<Integer, NpcDefinitionMetadata> npcDefinitions,
 		Map<Integer, ObjectDefinitionMetadata> objectDefinitions)
 	{
+		return restored(recordingId, pluginVersion, runeLiteVersion, gameRevision, startedAt,
+			endedAt, name, DEFAULT_CAPABILITIES, ticks, npcDefinitions, objectDefinitions);
+	}
+
+	static CombatRecording restored(String recordingId, String pluginVersion, String runeLiteVersion,
+		Integer gameRevision, long startedAt, long endedAt, String name, List<String> capabilities,
+		List<RecordedTick> ticks, Map<Integer, NpcDefinitionMetadata> npcDefinitions,
+		Map<Integer, ObjectDefinitionMetadata> objectDefinitions)
+	{
 		return new CombatRecording(FORMAT_VERSION, recordingId, pluginVersion, runeLiteVersion,
 			gameRevision, startedAt, endedAt, name,
+			Collections.unmodifiableList(new ArrayList<>(capabilities)),
 			Collections.unmodifiableList(new ArrayList<>(ticks)),
 			Collections.unmodifiableMap(new HashMap<>(npcDefinitions)),
 			Collections.unmodifiableMap(new HashMap<>(objectDefinitions)));
