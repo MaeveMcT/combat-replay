@@ -8,7 +8,7 @@ On each game tick the plugin records all visible players and NPCs in the top-lev
 
 The local player's complete inventory and equipment are captured by slot every tick and whenever either container changes, preserving intra-tick gear switches. Item actions such as Eat, Drink, Wear, and Wield are recorded with the item ID and inventory slot. Current/base Hitpoints and Prayer are captured every tick, with each increase or decrease represented as a resource-change event. Together these observations allow consumable actions to be correlated with the resulting HP or Prayer gain without relying on a static food or potion list.
 
-Format v1 writes the exact display names of every visible player into each private recording, including players who do not use Combat Replay. Names are sensitive replay content: recordings should be shared only with people you trust. When web upload is enabled, the private upload will contain these names; they are not used for public profiles, global search, analytics, or dashboard summaries.
+Format v1 writes the exact display names of every visible player into each private recording, including players who do not use Combat Replay. Names are sensitive replay content: recordings should be shared only with people you trust. When web upload is enabled, the private upload will contain these names; they are not used for public profiles, global search, analytics, or dashboard summaries. Recordings also include the local player's inventory and equipment, nearby actors and scene data, and action attempts. Uploads go to the configured website; its operator can access stored data. The plugin retains local JSON after upload. Owner-local Gauntlet diagnostics are opt-in and never uploaded.
 
 ## Using it
 
@@ -16,14 +16,14 @@ Format v1 writes the exact display names of every visible player into each priva
 2. Select **Start recording** while logged in.
 3. Complete or observe an encounter.
 4. Select **Stop and save**.
-5. To enable private web uploads, configure the web address, choose **Pair web device**, and enter the pairing code shown by the website.
+5. To enable private web uploads, enter the website's HTTPS address under **Web address**, choose **Pair web device**, and enter the pairing code shown by that website. Uploads are off by default. The address may be a hostname or an IPv4/IPv6 address; HTTPS certificate validation still applies to IP addresses. Plain HTTP is allowed only for localhost or loopback IPs (127.0.0.1 and [::1]) for local development.
 6. With uploads enabled, view your recordings on the Combat Replay website. The plugin has no local replay viewer.
 
-The web service supports public email-verified accounts. Free includes the web viewer with limited storage; Pro currently grants more storage through an administrator, with no actual payments yet. Web plans never restrict local recording.
+The web service supports email-verified accounts and provides the replay viewer. Storage allowances and subscription options are shown on the website; web plans never restrict local recording.
 
 If web storage is full, the uploader persists a paused state and retains the local file. Free space on the web or obtain more storage, then select the recording in the library and choose **Upload / retry**. Selecting a recording shows its stored upload status; hover the status for full guidance. A quota pause never retries automatically, including after restart. Revoked devices must be paired again. Upload work is stopped on plugin shutdown.
 
-When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can rename, delete, reveal, and retry uploads of recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
+When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can rename, delete, reveal, and retry uploads of recordings. Renaming a recording also changes its local filename, so avoid putting player names or other secrets in a title. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
 
 ## Limits
 
@@ -41,3 +41,9 @@ export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew test
 ./gradlew run
 ```
+
+For local multi-plugin testing, use the sibling `runelite-plugin-dev-client/` harness. The web address must be configured explicitly before pairing; this project does not bundle or deploy the web service.
+
+## License
+
+BSD 2-Clause License. See [LICENSE](LICENSE).

@@ -131,6 +131,17 @@ final class CombatRecorder
 		return recording == null ? null : recording.snapshot();
 	}
 
+	int tickCount()
+	{
+		return recording == null ? 0 : recording.ticks.size();
+	}
+
+	int lastTickActorCount()
+	{
+		return recording == null || recording.ticks.isEmpty() ? 0
+			: recording.ticks.get(recording.ticks.size() - 1).actors.size();
+	}
+
 	String recordingId()
 	{
 		return recording == null ? null : recording.recordingId;

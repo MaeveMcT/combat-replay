@@ -92,10 +92,16 @@ public class ReplayUploadClientTest
     }
 
     @Test
-    public void refusesToSendDeviceTokenOverRemotePlaintextHttp()
+    public void acceptsHttpsHostnamesAndIpAddressesAndLocalHttpOnly()
     {
+        for (String address : new String[]{"https://replay.example.com", "https://192.0.2.1:3000",
+            "https://[2001:db8::1]:3000", "http://localhost:3000", "http://127.0.0.1:3000",
+            "http://[::1]:3000"})
+        {
+            new ReplayUploadClient(URI.create(address), Runnable::run);
+        }
         assertThrows(IllegalArgumentException.class,
-            () -> new ReplayUploadClient(URI.create("http://example.com"), Runnable::run));
+            () -> new ReplayUploadClient(URI.create("http://192.0.2.1:3000"), Runnable::run));
     }
 
     @Test

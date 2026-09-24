@@ -28,8 +28,9 @@ import net.runelite.client.ui.components.shadowlabel.JShadowedLabel;
 @Singleton
 final class CombatReplayPanel extends PluginPanel
 {
-	static final String PRIVACY_DISCLOSURE = "Recordings contain the exact names of all visible players "
-		+ "and may later be uploaded privately. Replays contain client observations, not authoritative server state.";
+	static final String PRIVACY_DISCLOSURE = "Recordings contain the exact names of all visible players, "
+		+ "your inventory and equipment, and client-observed actions. They may later be uploaded privately "
+		+ "to the configured website, whose operator can access them. Replays contain client observations, not authoritative server state.";
 
 	private final RecordingStore store;
 	private final JLabel status = new JShadowedLabel("Ready to record");
@@ -100,9 +101,9 @@ final class CombatReplayPanel extends PluginPanel
 		});
 	}
 
-	void updateRecording(CombatRecording recording)
+	void updateRecording(int ticks, int actors)
 	{
-		SwingUtilities.invokeLater(() -> { int actors = recording.ticks.isEmpty() ? 0 : recording.ticks.get(recording.ticks.size() - 1).actors.size(); liveStats.setText(recording.ticks.size() + " ticks · " + actors + " visible actors"); });
+		SwingUtilities.invokeLater(() -> liveStats.setText(ticks + " ticks · " + actors + " visible actors"));
 	}
 
 	void recordingStopped(CombatRecording recording, String message, boolean saved)

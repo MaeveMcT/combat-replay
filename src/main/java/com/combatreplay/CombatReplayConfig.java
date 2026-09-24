@@ -20,11 +20,11 @@ public interface CombatReplayConfig extends Config
     @ConfigItem(
         keyName = "webAddress",
         name = "Web address",
-        description = "Combat Replay web service address"
+        description = "HTTPS address of the Combat Replay website (required for pairing and uploads)"
     )
     default String webAddress()
     {
-        return "http://localhost:3000";
+        return "";
     }
 
     @ConfigItem(
@@ -34,7 +34,7 @@ public interface CombatReplayConfig extends Config
     )
     default boolean cra201Diagnostics()
     {
-        return true;
+        return false;
     }
 
     @ConfigItem(

@@ -243,7 +243,7 @@ public class CombatReplayPlugin extends Plugin
 			try
 			{
 				Path path = store.save(recording);
-				log.debug("Saved combat recording to {}", path);
+				log.debug("Saved combat recording");
 				writeDiagnostics(diagnostics);
 				queueUpload(path, recording.recordingId);
 				if (updatePanel)
@@ -253,7 +253,8 @@ public class CombatReplayPlugin extends Plugin
 			}
 			catch (IOException | RuntimeException exception)
 			{
-				log.warn("Unable to save combat recording", exception);
+				// Exception messages may include private recording names or local paths.
+				log.warn("Unable to save combat recording ({})", exception.getClass().getSimpleName());
 				if (updatePanel)
 				{
 					panel.recordingStopped(recording, "Could not save recording", false);
@@ -277,7 +278,7 @@ public class CombatReplayPlugin extends Plugin
 		}
 		catch (IOException | RuntimeException exception)
 		{
-			log.warn("Unable to save CRA-201 diagnostics", exception);
+			log.warn("Unable to save CRA-201 diagnostics ({})", exception.getClass().getSimpleName());
 		}
 	}
 
@@ -326,7 +327,7 @@ public class CombatReplayPlugin extends Plugin
 		recorder.captureTick();
 		if (recorder.isRecording())
 		{
-			panel.updateRecording(recorder.snapshot());
+			panel.updateRecording(recorder.tickCount(), recorder.lastTickActorCount());
 		}
 	}
 

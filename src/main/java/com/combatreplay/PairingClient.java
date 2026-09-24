@@ -31,7 +31,7 @@ public final class PairingClient
     {
         String host = uri.getHost();
         boolean loopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
-            || "::1".equals(host);
+            || "[::1]".equals(host);
         boolean secure = "https".equalsIgnoreCase(uri.getScheme());
         if (host == null || uri.getUserInfo() != null || !(secure || loopback && "http".equalsIgnoreCase(uri.getScheme())))
         {

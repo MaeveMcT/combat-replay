@@ -1,6 +1,7 @@
 package com.combatreplay;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
@@ -31,6 +32,19 @@ public class PairingClientTest
     public void tearDown()
     {
         server.stop(0);
+    }
+
+    @Test
+    public void acceptsHttpsHostnamesAndIpAddressesAndLocalHttpOnly()
+    {
+        for (String address : new String[]{"https://replay.example.com", "https://192.0.2.1:3000",
+            "https://[2001:db8::1]:3000", "http://localhost:3000", "http://127.0.0.1:3000",
+            "http://[::1]:3000"})
+        {
+            new PairingClient(URI.create(address));
+        }
+        assertThrows(IllegalArgumentException.class,
+            () -> new PairingClient(URI.create("http://192.0.2.1:3000")));
     }
 
     @Test

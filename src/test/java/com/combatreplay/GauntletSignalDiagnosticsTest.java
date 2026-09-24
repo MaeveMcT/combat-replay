@@ -29,11 +29,11 @@ import org.junit.rules.TemporaryFolder;
 public class GauntletSignalDiagnosticsTest
 {
 	@Test
-	public void diagnosticsDefaultOnDuringCra201Investigation()
+	public void diagnosticsAreOptIn()
 	{
 		CombatReplayConfig config = new CombatReplayConfig() { };
 
-		assertTrue(config.cra201Diagnostics());
+		assertFalse(config.cra201Diagnostics());
 	}
 
 	private static final String RECORDING_ID = "123e4567-e89b-42d3-a456-426614174000";
