@@ -44,6 +44,8 @@ final class CombatRecorder
 	private final List<ContainerSnapshot> pendingContainerChanges = new ArrayList<>();
 	private final Map<String, String> recordedTiles = new HashMap<>();
 	private static final int LIFECYCLE_RESYNC_TICKS = 10;
+	// Bound in-memory capture until recording can be streamed incrementally to disk.
+	static final int MAX_TICKS = 3000; // Approximately 30 minutes.
 
 	private final Set<String> previousPrayers = new HashSet<>();
 	private final Map<Integer, Integer> previousActivitySignals = new HashMap<>();
@@ -302,7 +304,7 @@ final class CombatRecorder
 
 	void captureTick()
 	{
-		if (!isRecording())
+		if (!isRecording() || recording.ticks.size() >= MAX_TICKS)
 		{
 			return;
 		}

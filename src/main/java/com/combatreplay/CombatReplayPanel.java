@@ -5,6 +5,8 @@ import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -33,6 +35,8 @@ final class CombatReplayPanel extends PluginPanel
 		+ "to the configured website, whose operator can access them. Replays contain client observations, not authoritative server state.";
 
 	private final RecordingStore store;
+	private final ScheduledExecutorService executor;
+	private final AtomicInteger libraryGeneration = new AtomicInteger();
 	private final JLabel status = new JShadowedLabel("Ready to record");
 	private final JLabel liveStats = new JShadowedLabel(" ");
 	private final JButton recordButton = new JButton("Start recording");
@@ -43,30 +47,38 @@ final class CombatReplayPanel extends PluginPanel
 	private Consumer<String> pairDeviceAction;
 	private Consumer<StoredRecording> uploadAction;
 	private Consumer<StoredRecording> uploadStatusAction;
+	private RenameAction renameAction;
 	private final JLabel uploadStatus = new JShadowedLabel(" ");
 
 	@Inject
-	CombatReplayPanel(RecordingStore store)
+	CombatReplayPanel(RecordingStore store, ScheduledExecutorService executor)
 	{
 		this.store = store;
+		this.executor = executor;
 		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS)); setBackground(ColorScheme.DARK_GRAY_COLOR);
 		add(header()); add(Box.createVerticalStrut(6)); add(recordingCard()); add(Box.createVerticalStrut(6));
 		add(libraryCard()); add(Box.createVerticalStrut(6)); add(noteCard());
 		recordButton.addActionListener(event -> { if (toggleRecording != null) toggleRecording.run(); });
 		pairDevice.addActionListener(event -> requestPairing());
-		refreshLibrary();
 	}
 
 	void setToggleRecording(Runnable action) { toggleRecording = action; }
 	void setPairDevice(Consumer<String> action) { pairDeviceAction = action; }
 	void setUpload(Consumer<StoredRecording> action) { uploadAction = action; }
 	void setUploadStatus(Consumer<StoredRecording> action) { uploadStatusAction = action; }
+	void setRename(RenameAction action) { renameAction = action; }
 
-	void uploadStatusChanged(String message)
+	interface RenameAction
+	{
+		void rename(StoredRecording recording, String name) throws IOException;
+	}
+
+	void uploadStatusChanged(String recordingId, String message)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			if (uploadAction != null)
+			StoredRecording selected = library.getSelectedValue();
+			if (uploadAction != null && selected != null && selected.recordingId.equals(recordingId))
 			{
 				uploadStatus.setText(message.startsWith("Storage full") ? "Storage full — upload paused" : message);
 				uploadStatus.setToolTipText(message);
@@ -117,6 +129,8 @@ final class CombatReplayPanel extends PluginPanel
 		pairDeviceAction = null;
 		uploadAction = null;
 		uploadStatusAction = null;
+		renameAction = null;
+		libraryGeneration.incrementAndGet();
 	}
 
 	private JPanel header()
@@ -153,8 +167,12 @@ final class CombatReplayPanel extends PluginPanel
 		library.addListSelectionListener(event ->
 		{
 			StoredRecording selected = library.getSelectedValue();
-			if (!event.getValueIsAdjusting() && selected != null && uploadStatusAction != null)
-				uploadStatusAction.accept(selected);
+			if (!event.getValueIsAdjusting())
+			{
+				uploadStatus.setText(" ");
+				uploadStatus.setToolTipText(null);
+				if (selected != null && uploadStatusAction != null) uploadStatusAction.accept(selected);
+			}
 		});
 		panel.add(Box.createVerticalStrut(5)); panel.add(upload); panel.add(uploadStatus);
 		return panel;
@@ -166,10 +184,36 @@ final class CombatReplayPanel extends PluginPanel
 		JLabel text = new JLabel("<html><div style='width:190px'>" + PRIVACY_DISCLOSURE + "</div></html>"); text.setFont(FontManager.getRunescapeSmallFont()); text.setForeground(ColorScheme.LIGHT_GRAY_COLOR); panel.add(text); return panel;
 	}
 
-	private void refreshLibrary()
+	void refreshLibrary()
 	{
-		try { libraryModel.clear(); for (StoredRecording recording : store.list()) libraryModel.addElement(recording); }
-		catch (IOException exception) { status.setText("Could not read recording library"); status.setForeground(ColorScheme.PROGRESS_ERROR_COLOR); }
+		int generation = libraryGeneration.incrementAndGet();
+		executor.execute(() ->
+		{
+			try
+			{
+				java.util.List<StoredRecording> recordings = store.list();
+				SwingUtilities.invokeLater(() ->
+				{
+					if (generation != libraryGeneration.get()) return;
+					String selectedId = library.getSelectedValue() == null ? null : library.getSelectedValue().recordingId;
+					libraryModel.clear();
+					for (StoredRecording recording : recordings)
+					{
+						libraryModel.addElement(recording);
+						if (recording.recordingId.equals(selectedId)) library.setSelectedValue(recording, true);
+					}
+				});
+			}
+			catch (IOException exception)
+			{
+				SwingUtilities.invokeLater(() ->
+				{
+					if (generation != libraryGeneration.get()) return;
+					status.setText("Could not read recording library");
+					status.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
+				});
+			}
+		});
 	}
 
 	private void requestPairing()
@@ -186,7 +230,8 @@ final class CombatReplayPanel extends PluginPanel
 	{
 		StoredRecording selected = library.getSelectedValue(); if (selected == null) return;
 		String name = JOptionPane.showInputDialog(this, "Recording name", selected.toString()); if (name == null || name.trim().isEmpty()) return;
-		try { store.rename(selected, name); refreshLibrary(); } catch (IOException exception) { showError("Could not rename recording"); }
+		if (renameAction == null) return;
+		try { renameAction.rename(selected, name); refreshLibrary(); } catch (IOException exception) { showError("Could not rename recording"); }
 	}
 
 	private void deleteSelected()

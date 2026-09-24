@@ -88,6 +88,7 @@ public class CombatReplayPlugin extends Plugin
 	@Inject private ConfigManager configManager;
 
 	private NavigationButton navigationButton;
+	private volatile PairingClient pendingPairing;
 	private volatile boolean active;
 	private final java.util.Map<String, ReplayUploadQueue> uploadQueues = new java.util.HashMap<>();
 
@@ -111,18 +112,20 @@ public class CombatReplayPlugin extends Plugin
 		clientToolbar.addNavigation(navigationButton);
 		panel.setToggleRecording(() -> clientThread.invoke(this::toggleRecording));
 		panel.setPairDevice(this::pairDevice);
-		panel.setUpload(selected -> queueUpload(selected.path, selected.recording.recordingId, true));
+		panel.setUpload(selected -> queueUpload(selected.path, selected.recordingId, true));
+		panel.setRename(this::renameRecording);
+		panel.refreshLibrary();
 		panel.setUploadStatus(selected -> executor.execute(() ->
 		{
 			try
 			{
 				UploadSidecarState state = new UploadSidecarStore(new Gson(), store.directory())
-					.load(selected.recording.recordingId);
-				if (active) panel.uploadStatusChanged(ReplayUploadQueue.message(state));
+					.load(selected.recordingId);
+				if (active) panel.uploadStatusChanged(selected.recordingId, ReplayUploadQueue.message(state));
 			}
 			catch (IOException exception)
 			{
-				if (active) panel.uploadStatusChanged("Could not read upload status");
+				if (active) panel.uploadStatusChanged(selected.recordingId, "Could not read upload status");
 			}
 		}));
 		log.debug("Combat Replay started");
@@ -132,6 +135,9 @@ public class CombatReplayPlugin extends Plugin
 	protected void shutDown()
 	{
 		active = false;
+		PairingClient pairing = pendingPairing;
+		pendingPairing = null;
+		if (pairing != null) pairing.close();
 		closeUploadQueues();
 		if (recorder.isRecording())
 		{
@@ -207,18 +213,23 @@ public class CombatReplayPlugin extends Plugin
 			panel.pairingFinished(false);
 			return;
 		}
+		PairingClient previous = pendingPairing;
+		pendingPairing = pairingClient;
+		if (previous != null) previous.close();
 		String pluginVersion = getClass().getPackage().getImplementationVersion();
 		pairingClient.exchange(code, "RuneLite desktop",
 			pluginVersion == null ? "development" : pluginVersion,
 			RuneLiteProperties.getVersion() == null ? "unknown" : RuneLiteProperties.getVersion())
 			.whenComplete((credentials, error) ->
 			{
+				if (!active || pendingPairing != pairingClient) return;
+				pendingPairing = null;
+				pairingClient.close();
 				if (error != null)
 				{
 					panel.pairingFinished(false);
 					return;
 				}
-				if (!active) return;
 				closeUploadQueues();
 				configManager.setConfiguration("combatreplay", "deviceToken", credentials.getToken());
 				configManager.setConfiguration("combatreplay", "uploadEnabled", true);
@@ -228,6 +239,12 @@ public class CombatReplayPlugin extends Plugin
 
 	private void save(CombatRecording recording, GauntletSignalDiagnostics.Snapshot diagnostics,
 		boolean updatePanel)
+	{
+		save(recording, diagnostics, updatePanel, false);
+	}
+
+	private void save(CombatRecording recording, GauntletSignalDiagnostics.Snapshot diagnostics,
+		boolean updatePanel, boolean reachedLimit)
 	{
 		if (recording == null || recording.ticks.isEmpty())
 		{
@@ -248,7 +265,8 @@ public class CombatReplayPlugin extends Plugin
 				queueUpload(path, recording.recordingId);
 				if (updatePanel)
 				{
-					panel.recordingStopped(recording, "Saved " + path.getFileName(), true);
+					panel.recordingStopped(recording,
+						(reachedLimit ? "30-minute limit reached; saved " : "Saved ") + path.getFileName(), true);
 				}
 			}
 			catch (IOException | RuntimeException exception)
@@ -287,6 +305,18 @@ public class CombatReplayPlugin extends Plugin
 		queueUpload(path, recordingId, false);
 	}
 
+	private void renameRecording(StoredRecording selected, String name) throws IOException
+	{
+		// Stop in-flight reads before moving the source, then resume using its new path.
+		synchronized (this)
+		{
+			ReplayUploadQueue queue = uploadQueues.remove(selected.recordingId);
+			if (queue != null) queue.close();
+		}
+		StoredRecording renamed = store.rename(selected, name);
+		queueUpload(renamed.path, renamed.recordingId);
+	}
+
 	private synchronized void closeUploadQueues()
 	{
 		for (ReplayUploadQueue queue : uploadQueues.values()) queue.close();
@@ -299,7 +329,7 @@ public class CombatReplayPlugin extends Plugin
 		String token = config.deviceToken();
 		if (!config.uploadEnabled() || token == null || token.trim().isEmpty())
 		{
-			if (manualRetry) panel.uploadStatusChanged("Pair a web device and enable uploads first");
+			if (manualRetry) panel.uploadStatusChanged(recordingId, "Pair a web device and enable uploads first");
 			return;
 		}
 		try
@@ -309,7 +339,8 @@ public class CombatReplayPlugin extends Plugin
 			{
 				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor);
 				UploadSidecarStore sidecars = new UploadSidecarStore(new Gson(), store.directory());
-				queue = new ReplayUploadQueue(client, sidecars, executor, token, panel::uploadStatusChanged);
+				queue = new ReplayUploadQueue(client, sidecars, executor, token,
+					message -> panel.uploadStatusChanged(recordingId, message));
 				uploadQueues.put(recordingId, queue);
 			}
 			queue.enqueue(path, recordingId, manualRetry);
@@ -327,7 +358,14 @@ public class CombatReplayPlugin extends Plugin
 		recorder.captureTick();
 		if (recorder.isRecording())
 		{
-			panel.updateRecording(recorder.tickCount(), recorder.lastTickActorCount());
+			if (recorder.tickCount() >= CombatRecorder.MAX_TICKS)
+			{
+				GauntletSignalDiagnostics.Snapshot diagnostics = gauntletDiagnostics.stop();
+				CombatRecording recording = recorder.stop();
+				panel.recordingSaving(recording);
+				save(recording, diagnostics, true, true);
+			}
+			else panel.updateRecording(recorder.tickCount(), recorder.lastTickActorCount());
 		}
 	}
 

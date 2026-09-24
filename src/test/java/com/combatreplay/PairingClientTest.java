@@ -3,11 +3,19 @@ package com.combatreplay;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,6 +53,32 @@ public class PairingClientTest
         }
         assertThrows(IllegalArgumentException.class,
             () -> new PairingClient(URI.create("http://192.0.2.1:3000")));
+    }
+
+    @Test
+    public void pairingRequestHasTimeoutAndCanBeCancelledOnShutdown()
+    {
+        HttpClient http = mock(HttpClient.class);
+        CompletableFuture<HttpResponse<String>> pending = new CompletableFuture<>();
+        when(http.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(invocation ->
+        {
+            HttpRequest request = invocation.getArgument(0);
+            assertEquals(Duration.ofSeconds(20), request.timeout().orElseThrow());
+            return pending;
+        });
+        PairingClient client = new PairingClient(baseUri, http);
+        client.exchange("CODE", "desktop", "1", "1");
+        client.close();
+        assertTrue(pending.isCancelled());
+    }
+
+    @Test
+    public void closedPairingClientRejectsNewRequests()
+    {
+        PairingClient client = new PairingClient(baseUri);
+        client.close();
+        assertThrows(IllegalStateException.class,
+            () -> client.exchange("CODE", "desktop", "1", "1"));
     }
 
     @Test

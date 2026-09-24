@@ -14,6 +14,38 @@ import org.junit.Test;
 public class CombatReplayLifecycleTest
 {
     @Test
+    public void recordingLimitStopsAndSavesInsteadOfDroppingFurtherTicks() throws Exception
+    {
+        CombatReplayPlugin plugin = new CombatReplayPlugin();
+        CombatRecorder recorder = mock(CombatRecorder.class);
+        GauntletSignalDiagnostics diagnostics = mock(GauntletSignalDiagnostics.class);
+        CombatReplayPanel panel = mock(CombatReplayPanel.class);
+        RecordingStore store = mock(RecordingStore.class);
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        CombatRecording recording = recordingWithOneTick();
+        when(recorder.isRecording()).thenReturn(true);
+        when(recorder.tickCount()).thenReturn(CombatRecorder.MAX_TICKS);
+        when(recorder.stop()).thenReturn(recording);
+        when(store.save(recording)).thenReturn(Paths.get("recording.json"));
+        org.mockito.Mockito.doAnswer(invocation ->
+        {
+            invocation.<Runnable>getArgument(0).run();
+            return null;
+        }).when(executor).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
+        inject(plugin, "recorder", recorder);
+        inject(plugin, "gauntletDiagnostics", diagnostics);
+        inject(plugin, "panel", panel);
+        inject(plugin, "store", store);
+        inject(plugin, "executor", executor);
+
+        plugin.onGameTick(null);
+
+        verify(recorder).stop();
+        verify(store).save(recording);
+        verify(panel).recordingStopped(recording, "30-minute limit reached; saved recording.json", true);
+    }
+
+    @Test
     public void shutdownStopsAndSavesAnActiveManualRecording() throws Exception
     {
         CombatReplayPlugin plugin = new CombatReplayPlugin();

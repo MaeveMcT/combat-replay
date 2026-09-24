@@ -3,6 +3,7 @@ package com.combatreplay;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -61,7 +62,7 @@ final class RecordingStore
 				.forEach(path -> {
 					try
 					{
-						recordings.add(new StoredRecording(path, load(path)));
+						recordings.add(new StoredRecording(path, recordingId(path)));
 					}
 					catch (IOException | RuntimeException ignored)
 					{
@@ -83,19 +84,41 @@ final class RecordingStore
 
 	StoredRecording rename(StoredRecording stored, String name) throws IOException
 	{
-		CombatRecording renamed = stored.recording.renamed(name.trim());
 		Path destination = uniquePath(directory(), safeFileName(name));
-		write(renamed, destination);
-		if (!destination.equals(stored.path))
-		{
-			Files.deleteIfExists(stored.path);
-		}
-		return new StoredRecording(destination, renamed);
+		// A local rename must not change the upload bytes for this recording ID.
+		Files.move(stored.path, destination);
+		return new StoredRecording(destination, stored.recordingId);
 	}
 
 	void delete(StoredRecording recording) throws IOException
 	{
 		Files.deleteIfExists(recording.path);
+	}
+
+	private String recordingId(Path path) throws IOException
+	{
+		String id = null;
+		int version = -1;
+		try (JsonReader reader = new JsonReader(Files.newBufferedReader(path, StandardCharsets.UTF_8)))
+		{
+			reader.beginObject();
+			while (reader.hasNext())
+			{
+				switch (reader.nextName())
+				{
+					case "recording_id": id = reader.nextString(); break;
+					case "format_version": version = reader.nextInt(); break;
+					default: reader.skipValue();
+				}
+					if (id != null && version == CombatRecording.FORMAT_VERSION) break;
+			}
+		}
+		if (version != CombatRecording.FORMAT_VERSION || id == null
+			|| !id.matches("[0-9a-fA-F-]{36}"))
+		{
+			throw new IOException("Unsupported recording metadata");
+		}
+		return id;
 	}
 
 	private void write(CombatRecording recording, Path destination) throws IOException
@@ -105,7 +128,7 @@ final class RecordingStore
 		{
 			try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
 			{
-				gson.toJson(ReplayV1Format.encode(recording), writer);
+				ReplayV1Format.write(recording, gson, writer);
 			}
 			try
 			{

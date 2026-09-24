@@ -6,14 +6,17 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-public final class PairingClient
+public final class PairingClient implements AutoCloseable
 {
     private static final Gson GSON = new Gson();
     private final URI exchangeUri;
     private final HttpClient httpClient;
+    private volatile boolean closed;
+    private CompletableFuture<?> pending;
 
     public PairingClient(URI baseUri)
     {
@@ -47,13 +50,33 @@ public final class PairingClient
     {
         PairingRequest payload = new PairingRequest(code, deviceName, pluginVersion, runeLiteVersion);
         HttpRequest request = HttpRequest.newBuilder(exchangeUri)
+            .timeout(Duration.ofSeconds(20))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
             .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenApply(this::parseResponse);
+        synchronized (this)
+        {
+            if (closed) throw new IllegalStateException("Pairing client closed");
+            CompletableFuture<HttpResponse<String>> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+            pending = response;
+            response.whenComplete((result, error) -> clearPending(response));
+            return response.thenApply(this::parseResponse);
+        }
+    }
+
+    private synchronized void clearPending(CompletableFuture<?> response)
+    {
+        if (pending == response) pending = null;
+    }
+
+    @Override
+    public synchronized void close()
+    {
+        closed = true;
+        if (pending != null) pending.cancel(true);
+        pending = null;
     }
 
     private PairingCredentials parseResponse(HttpResponse<String> response)

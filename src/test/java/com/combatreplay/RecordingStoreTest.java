@@ -30,6 +30,10 @@ public class RecordingStoreTest
 
 		Path path = store.save(source);
 		CombatRecording loaded = store.load(path);
+		try (Reader reader = Files.newBufferedReader(path))
+		{
+			assertEquals(ReplayV1Format.encode(source), new JsonParser().parse(reader));
+		}
 
 		assertEquals(source.recordingId, loaded.recordingId);
 		assertEquals(2, loaded.ticks.size());
@@ -53,6 +57,35 @@ public class RecordingStoreTest
 			assertTrue(ticks.get(0).getAsJsonObject().has("actors"));
 			assertTrue(ticks.get(0).getAsJsonObject().has("scene"));
 		}
+	}
+
+	@Test
+	public void renamePreservesUploadBytesAndListingDoesNotDecodeTicks() throws Exception
+	{
+		Path directory = temporary.newFolder("library").toPath();
+		RecordingStore store = new RecordingStore(new Gson(), directory);
+		Path path = store.save(recording().completed(2_000L));
+		byte[] original = Files.readAllBytes(path);
+		StoredRecording stored = store.list().get(0);
+		StoredRecording renamed = store.rename(stored, "Local title");
+
+		assertFalse(Files.exists(path));
+		assertEquals("Local title", renamed.toString());
+		assertEquals(stored.recordingId, renamed.recordingId);
+		assertTrue(java.util.Arrays.equals(original, Files.readAllBytes(renamed.path)));
+		assertEquals(stored.recordingId, store.list().get(0).recordingId);
+		assertEquals(stored.recordingId, store.load(renamed.path).recordingId);
+	}
+
+	@Test
+	public void listingReadsOnlyMetadataWithoutDecodingTicks() throws Exception
+	{
+		Path directory = temporary.newFolder("metadata").toPath();
+		String id = "123e4567-e89b-42d3-a456-426614174000";
+		Files.writeString(directory.resolve("Test.json"),
+			"{\"format_version\":1,\"recording_id\":\"" + id + "\",\"ticks\":[not parsed]}");
+		RecordingStore store = new RecordingStore(new Gson(), directory);
+		assertEquals(id, store.list().get(0).recordingId);
 	}
 
 	private static CombatRecording recording()

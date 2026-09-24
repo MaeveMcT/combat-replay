@@ -3,6 +3,10 @@ package com.combatreplay;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.google.gson.Gson;
+import com.google.gson.stream.JsonWriter;
+import java.io.IOException;
+import java.io.Writer;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +24,41 @@ final class ReplayV1Format
 
     static JsonObject encode(CombatRecording recording)
     {
+        JsonObject root = header(recording);
+        root.add("ticks", ticks(recording));
+        return root;
+    }
+
+    static void write(CombatRecording recording, Gson gson, Writer writer) throws IOException
+    {
+        JsonWriter output = new JsonWriter(writer);
+        output.beginObject();
+        for (Map.Entry<String, com.google.gson.JsonElement> entry : header(recording).entrySet())
+        {
+            output.name(entry.getKey());
+            gson.toJson(entry.getValue(), output);
+        }
+        output.name("ticks");
+        output.beginArray();
+        Map<String, ActorSnapshot> previousActors = new LinkedHashMap<>();
+        LocalCombatState previousCombatState = null;
+        int nextEventId = 1;
+        for (int index = 0; index < recording.ticks.size(); index++)
+        {
+            RecordedTick tick = recording.ticks.get(index);
+            gson.toJson(encodedTick(recording, tick, index, previousActors, previousCombatState, nextEventId), output);
+            nextEventId += tick.events.size();
+            previousActors.clear();
+            for (ActorSnapshot actor : tick.actors) previousActors.put(actor.key, actor);
+            previousCombatState = tick.combatState;
+        }
+        output.endArray();
+        output.endObject();
+        output.flush();
+    }
+
+    private static JsonObject header(CombatRecording recording)
+    {
         JsonObject root = new JsonObject();
         root.addProperty("format_version", 1);
         root.addProperty("recording_id", recording.recordingId);
@@ -29,7 +68,6 @@ final class ReplayV1Format
         root.add("producer", producer(recording));
         root.add("capture", capture(recording));
         root.add("dictionaries", dictionaries(recording));
-        root.add("ticks", ticks(recording));
         return root;
     }
 
@@ -124,24 +162,8 @@ final class ReplayV1Format
         for (int index = 0; index < recording.ticks.size(); index++)
         {
             RecordedTick tick = recording.ticks.get(index);
-            JsonObject encoded = new JsonObject();
-            encoded.addProperty("index", index);
-            encoded.addProperty("keyframe", index == 0);
-            encoded.add("sync", sync(recording, tick, index));
-            encoded.add("context", context(tick));
-            encoded.add("local_state", localState(tick, previousCombatState));
-            encoded.add("actors", actors(tick, previousActors));
-            encoded.add("scene", scene(tick));
-            encoded.add("projectiles", projectiles(tick));
-            encoded.add("ground_items", groundItems(tick));
-            encoded.add("container_changes", containers(tick.containerChanges));
-            JsonArray events = new JsonArray();
-            for (RecordedEvent event : tick.events)
-            {
-                events.add(event(event, tick, nextEventId++));
-            }
-            encoded.add("events", events);
-            result.add(encoded);
+            result.add(encodedTick(recording, tick, index, previousActors, previousCombatState, nextEventId));
+            nextEventId += tick.events.size();
             previousActors.clear();
             for (ActorSnapshot actor : tick.actors)
             {
@@ -150,6 +172,26 @@ final class ReplayV1Format
             previousCombatState = tick.combatState;
         }
         return result;
+    }
+
+    private static JsonObject encodedTick(CombatRecording recording, RecordedTick tick, int index,
+        Map<String, ActorSnapshot> previousActors, LocalCombatState previousCombatState, int nextEventId)
+    {
+        JsonObject encoded = new JsonObject();
+        encoded.addProperty("index", index);
+        encoded.addProperty("keyframe", index == 0);
+        encoded.add("sync", sync(recording, tick, index));
+        encoded.add("context", context(tick));
+        encoded.add("local_state", localState(tick, previousCombatState));
+        encoded.add("actors", actors(tick, previousActors));
+        encoded.add("scene", scene(tick));
+        encoded.add("projectiles", projectiles(tick));
+        encoded.add("ground_items", groundItems(tick));
+        encoded.add("container_changes", containers(tick.containerChanges));
+        JsonArray events = new JsonArray();
+        for (RecordedEvent event : tick.events) events.add(event(event, tick, nextEventId++));
+        encoded.add("events", events);
+        return encoded;
     }
 
     private static JsonObject sync(CombatRecording recording, RecordedTick tick, int index)
