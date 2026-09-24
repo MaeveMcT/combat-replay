@@ -4,11 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dimension;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -39,12 +35,9 @@ final class CombatReplayPanel extends PluginPanel
 	private final JLabel status = new JShadowedLabel("Ready to record");
 	private final JLabel liveStats = new JShadowedLabel(" ");
 	private final JButton recordButton = new JButton("Start recording");
-	private final JButton openCurrent = new JButton("Open last replay");
 	private final JButton pairDevice = new JButton("Pair web device");
 	private final DefaultListModel<StoredRecording> libraryModel = new DefaultListModel<>();
 	private final JList<StoredRecording> library = new JList<>(libraryModel);
-	private final List<ReplayViewerFrame> viewers = new ArrayList<>();
-	private CombatRecording current;
 	private Runnable toggleRecording;
 	private Consumer<String> pairDeviceAction;
 	private Consumer<StoredRecording> uploadAction;
@@ -59,7 +52,6 @@ final class CombatReplayPanel extends PluginPanel
 		add(header()); add(Box.createVerticalStrut(6)); add(recordingCard()); add(Box.createVerticalStrut(6));
 		add(libraryCard()); add(Box.createVerticalStrut(6)); add(noteCard());
 		recordButton.addActionListener(event -> { if (toggleRecording != null) toggleRecording.run(); });
-		openCurrent.addActionListener(event -> open(current));
 		pairDevice.addActionListener(event -> requestPairing());
 		refreshLibrary();
 	}
@@ -94,14 +86,13 @@ final class CombatReplayPanel extends PluginPanel
 
 	void recordingStarted()
 	{
-		SwingUtilities.invokeLater(() -> { current = null; recordButton.setEnabled(true); recordButton.setText("Stop and save"); status.setText("● Recording observations"); status.setForeground(ColorScheme.PROGRESS_COMPLETE_COLOR); liveStats.setText("Waiting for first tick…"); openCurrent.setEnabled(false); });
+		SwingUtilities.invokeLater(() -> { recordButton.setEnabled(true); recordButton.setText("Stop and save"); status.setText("● Recording observations"); status.setForeground(ColorScheme.PROGRESS_COMPLETE_COLOR); liveStats.setText("Waiting for first tick…"); });
 	}
 
 	void recordingSaving(CombatRecording recording)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			current = recording;
 			recordButton.setEnabled(false);
 			recordButton.setText("Saving…");
 			status.setText("Recording stopped; writing replay");
@@ -111,12 +102,12 @@ final class CombatReplayPanel extends PluginPanel
 
 	void updateRecording(CombatRecording recording)
 	{
-		SwingUtilities.invokeLater(() -> { current = recording; int actors = recording.ticks.isEmpty() ? 0 : recording.ticks.get(recording.ticks.size() - 1).actors.size(); liveStats.setText(recording.ticks.size() + " ticks · " + actors + " visible actors"); });
+		SwingUtilities.invokeLater(() -> { int actors = recording.ticks.isEmpty() ? 0 : recording.ticks.get(recording.ticks.size() - 1).actors.size(); liveStats.setText(recording.ticks.size() + " ticks · " + actors + " visible actors"); });
 	}
 
 	void recordingStopped(CombatRecording recording, String message, boolean saved)
 	{
-		SwingUtilities.invokeLater(() -> { current = recording; recordButton.setEnabled(true); recordButton.setText("Start recording"); status.setText(message); status.setForeground(saved ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.PROGRESS_ERROR_COLOR); liveStats.setText(recording == null ? " " : recording.ticks.size() + " ticks captured"); openCurrent.setEnabled(recording != null && !recording.ticks.isEmpty()); refreshLibrary(); });
+		SwingUtilities.invokeLater(() -> { recordButton.setEnabled(true); recordButton.setText("Start recording"); status.setText(message); status.setForeground(saved ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.PROGRESS_ERROR_COLOR); liveStats.setText(recording == null ? " " : recording.ticks.size() + " ticks captured"); refreshLibrary(); });
 	}
 
 	void reset()
@@ -125,11 +116,6 @@ final class CombatReplayPanel extends PluginPanel
 		pairDeviceAction = null;
 		uploadAction = null;
 		uploadStatusAction = null;
-		SwingUtilities.invokeLater(() ->
-		{
-			for (ReplayViewerFrame viewer : new ArrayList<>(viewers)) viewer.dispose();
-			viewers.clear();
-		});
 	}
 
 	private JPanel header()
@@ -142,20 +128,19 @@ final class CombatReplayPanel extends PluginPanel
 	{
 		JPanel panel = card(); panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 		status.setAlignmentX(LEFT_ALIGNMENT); liveStats.setForeground(ColorScheme.LIGHT_GRAY_COLOR); liveStats.setAlignmentX(LEFT_ALIGNMENT);
-		configureButton(recordButton); configureButton(openCurrent); configureButton(pairDevice); openCurrent.setEnabled(false);
-		panel.add(status); panel.add(Box.createVerticalStrut(3)); panel.add(liveStats); panel.add(Box.createVerticalStrut(7)); panel.add(recordButton); panel.add(Box.createVerticalStrut(4)); panel.add(openCurrent); panel.add(Box.createVerticalStrut(4)); panel.add(pairDevice); return panel;
+		configureButton(recordButton); configureButton(pairDevice);
+		panel.add(status); panel.add(Box.createVerticalStrut(3)); panel.add(liveStats); panel.add(Box.createVerticalStrut(7)); panel.add(recordButton); panel.add(Box.createVerticalStrut(4)); panel.add(pairDevice); return panel;
 	}
 
 	private JPanel libraryCard()
 	{
 		JPanel panel = card(); panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); panel.add(caption("RECORDING LIBRARY")); panel.add(Box.createVerticalStrut(5));
 		library.setBackground(ColorScheme.DARK_GRAY_COLOR); library.setForeground(Color.WHITE); library.setVisibleRowCount(8); library.setFixedCellHeight(34); library.setToolTipText("Saved recordings");
-		library.addMouseListener(new java.awt.event.MouseAdapter() { @Override public void mouseClicked(java.awt.event.MouseEvent event) { if (event.getClickCount() == 2) open(library.getSelectedValue()); } });
 		JScrollPane scroll = new JScrollPane(library); scroll.setPreferredSize(new Dimension(210, 230)); scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 260)); scroll.setAlignmentX(LEFT_ALIGNMENT); panel.add(scroll);
-		JPanel actions = new JPanel(new java.awt.GridLayout(2, 2, 4, 4)); actions.setOpaque(false); actions.setAlignmentX(LEFT_ALIGNMENT);
-		JButton open = new JButton("Open"), rename = new JButton("Rename"), delete = new JButton("Delete"), reveal = new JButton("Reveal");
-		open.addActionListener(e -> open(library.getSelectedValue())); rename.addActionListener(e -> renameSelected()); delete.addActionListener(e -> deleteSelected()); reveal.addActionListener(e -> revealSelected());
-		actions.add(open); actions.add(rename); actions.add(delete); actions.add(reveal); panel.add(Box.createVerticalStrut(5)); panel.add(actions);
+		JPanel actions = new JPanel(new java.awt.GridLayout(1, 3, 4, 4)); actions.setOpaque(false); actions.setAlignmentX(LEFT_ALIGNMENT);
+		JButton rename = new JButton("Rename"), delete = new JButton("Delete"), reveal = new JButton("Reveal");
+		rename.addActionListener(e -> renameSelected()); delete.addActionListener(e -> deleteSelected()); reveal.addActionListener(e -> revealSelected());
+		actions.add(rename); actions.add(delete); actions.add(reveal); panel.add(Box.createVerticalStrut(5)); panel.add(actions);
 		JButton upload = new JButton("Upload / retry");
 		configureButton(upload);
 		upload.setToolTipText("After freeing web storage, select a recording and retry. The local file is retained.");
@@ -184,22 +169,6 @@ final class CombatReplayPanel extends PluginPanel
 	{
 		try { libraryModel.clear(); for (StoredRecording recording : store.list()) libraryModel.addElement(recording); }
 		catch (IOException exception) { status.setText("Could not read recording library"); status.setForeground(ColorScheme.PROGRESS_ERROR_COLOR); }
-	}
-
-	private void open(StoredRecording stored) { if (stored != null) open(stored.recording); }
-	private void open(CombatRecording recording)
-	{
-		if (recording == null || recording.ticks.isEmpty()) return;
-		SwingUtilities.invokeLater(() ->
-		{
-			ReplayViewerFrame viewer = new ReplayViewerFrame(recording);
-			viewers.add(viewer);
-			viewer.addWindowListener(new WindowAdapter()
-			{
-				@Override public void windowClosed(WindowEvent event) { viewers.remove(viewer); }
-			});
-			viewer.setVisible(true);
-		});
 	}
 
 	private void requestPairing()

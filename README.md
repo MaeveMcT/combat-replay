@@ -1,6 +1,6 @@
 # Combat Replay
 
-A RuneLite plugin that records client-observed combat state and replays it in a resizable, tick-accurate 2D viewer.
+A RuneLite plugin that records client-observed combat state and privately sends recordings to the Combat Replay web viewer.
 
 ## Current capture
 
@@ -17,18 +17,17 @@ Format v1 writes the exact display names of every visible player into each priva
 3. Complete or observe an encounter.
 4. Select **Stop and save**.
 5. To enable private web uploads, configure the web address, choose **Pair web device**, and enter the pairing code shown by the website.
-6. Select the saved recording and choose **Open** (or double-click it) to launch the expanded viewer.
-7. Click actors to inspect them, drag/wheel the map to pan/zoom, and use the timeline or tick controls for playback.
+6. With uploads enabled, view your recordings on the Combat Replay website. The plugin has no local replay viewer.
 
-The web service supports public email-verified accounts. Free keeps the current web viewer with limited storage; Pro currently grants more storage through an administrator, with no actual payments yet. Web plans never restrict local recording or desktop playback.
+The web service supports public email-verified accounts. Free includes the web viewer with limited storage; Pro currently grants more storage through an administrator, with no actual payments yet. Web plans never restrict local recording.
 
 If web storage is full, the uploader persists a paused state and retains the local file. Free space on the web or obtain more storage, then select the recording in the library and choose **Upload / retry**. Selecting a recording shows its stored upload status; hover the status for full guidance. A quota pause never retries automatically, including after restart. Revoked devices must be paired again. Upload work is stopped on plugin shutdown.
 
-When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can open, rename, delete, and reveal recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
+When paired and upload is enabled, newly saved recordings are gzip-compressed and checksummed away from the client thread, then uploaded without deleting or replacing the local JSON. Transient failures retry with bounded backoff, and upload state is stored by recording UUID under the local `.uploads` directory. The sidebar recording library can rename, delete, reveal, and retry uploads of recordings. Recordings receive encounter/result/duration names when those facts can be detected and are stored as format-v1 JSON under RuneLite's `combat-replay` directory. Version 1 includes a stable recording UUID, producer and synchronization metadata, explicit observation capabilities, item-name dictionaries, world/view context, instance mappings, actor/scene operations, local state, and evidence-labelled events. Earlier internal recording formats are intentionally unsupported.
 
 ## Limits
 
-This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source. The recorder conservatively emits inferred kill-attribution events when a terminal hitsplat is marked as the local player's damage or has exactly one recently observed projectile source; ambiguous, melee-only, poison/recoil, and stale evidence remains unattributed. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
+This records observations available to the local client, not authoritative server combat state. Hitsplats identify their target but often cannot identify their source. The recorder conservatively emits inferred kill-attribution events when a terminal hitsplat is marked as the local player's damage or has exactly one recently observed projectile source; ambiguous, melee-only, poison/recoil, and stale evidence remains unattributed. Other players' inventory, exact resources, offensive prayers, and actions without visible effects are unavailable. Off-screen and unloaded entities cannot be reconstructed. The web viewer presents observed evidence and generic event correlations; mechanic-aware conclusions still require encounter interpreters.
 
 A future group-content phase may support merging cooperative recordings from multiple consenting clients. Format v1 captures synchronization evidence for that future work, but does not claim a globally authoritative server tick.
 

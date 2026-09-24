@@ -1,5 +1,7 @@
 # Combat Replay Visualization Specification
 
+> Archived design notes for the former desktop viewer. The plugin no longer includes a viewer; visualization now belongs in `combat-replay-web/`. Do not use the desktop UI instructions below as current plugin behavior.
+
 
 # NEW PRIORITIES- REMOVE THIS SECTION WHEN DONE
 some sort of healthbar visualisation for actors that recently took damage

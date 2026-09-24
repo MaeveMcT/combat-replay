@@ -69,7 +69,7 @@ import net.runelite.client.util.Text;
 
 @PluginDescriptor(
 	name = "Combat Replay",
-	description = "Records combat observations and replays encounters on a 2D timeline",
+	description = "Records combat observations for private web replay uploads",
 	tags = {"combat", "replay", "boss", "pvm", "recording"}
 )
 public class CombatReplayPlugin extends Plugin
