@@ -2,8 +2,9 @@ package com.combatreplay;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -153,9 +154,9 @@ final class CombatReplayPanel extends PluginPanel
 		library.setBackground(ColorScheme.DARK_GRAY_COLOR); library.setForeground(Color.WHITE); library.setVisibleRowCount(8); library.setFixedCellHeight(34); library.setToolTipText("Saved recordings");
 		JScrollPane scroll = new JScrollPane(library); scroll.setPreferredSize(new Dimension(210, 230)); scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 260)); scroll.setAlignmentX(LEFT_ALIGNMENT); panel.add(scroll);
 		JPanel actions = new JPanel(new java.awt.GridLayout(1, 3, 4, 4)); actions.setOpaque(false); actions.setAlignmentX(LEFT_ALIGNMENT);
-		JButton rename = new JButton("Rename"), delete = new JButton("Delete"), reveal = new JButton("Reveal");
-		rename.addActionListener(e -> renameSelected()); delete.addActionListener(e -> deleteSelected()); reveal.addActionListener(e -> revealSelected());
-		actions.add(rename); actions.add(delete); actions.add(reveal); panel.add(Box.createVerticalStrut(5)); panel.add(actions);
+		JButton rename = new JButton("Rename"), delete = new JButton("Delete"), copyPath = new JButton("Copy path");
+		rename.addActionListener(e -> renameSelected()); delete.addActionListener(e -> deleteSelected()); copyPath.addActionListener(e -> copyFolderPath());
+		actions.add(rename); actions.add(delete); actions.add(copyPath); panel.add(Box.createVerticalStrut(5)); panel.add(actions);
 		JButton upload = new JButton("Upload / retry");
 		configureButton(upload);
 		upload.setToolTipText("After freeing web storage, select a recording and retry. The local file is retained.");
@@ -240,10 +241,11 @@ final class CombatReplayPanel extends PluginPanel
 		try { store.delete(selected); refreshLibrary(); } catch (IOException exception) { showError("Could not delete recording"); }
 	}
 
-	private void revealSelected()
+	private void copyFolderPath()
 	{
-		StoredRecording selected = library.getSelectedValue(); if (selected == null || !Desktop.isDesktopSupported()) return;
-		try { Desktop.getDesktop().open(selected.path.getParent().toFile()); } catch (IOException exception) { showError("Could not reveal recording folder"); }
+		StoredRecording selected = library.getSelectedValue(); if (selected == null) return;
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+			new StringSelection(selected.path.getParent().toString()), null);
 	}
 
 	private void showError(String message) { JOptionPane.showMessageDialog(this, message, "Combat Replay", JOptionPane.ERROR_MESSAGE); }

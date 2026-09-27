@@ -3,31 +3,26 @@ package com.combatreplay;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
 
 public final class PairingClient implements AutoCloseable
 {
     private final Gson gson;
     private final URI exchangeUri;
-    private final HttpClient httpClient;
+    private final OkHttpClient httpClient;
     private volatile boolean closed;
     private CompletableFuture<?> pending;
 
-    public PairingClient(URI baseUri, Gson gson)
-    {
-        this(baseUri, HttpClient.newHttpClient(), gson);
-    }
-
-    PairingClient(URI baseUri, HttpClient httpClient, Gson gson)
+    public PairingClient(URI baseUri, OkHttpClient httpClient, Gson gson)
     {
         validateBaseUri(baseUri);
         exchangeUri = baseUri.resolve("/api/v1/pairing/exchange");
-        this.httpClient = httpClient;
+        this.httpClient = Objects.requireNonNull(httpClient);
         this.gson = Objects.requireNonNull(gson);
     }
 
@@ -50,17 +45,15 @@ public final class PairingClient implements AutoCloseable
         String runeLiteVersion)
     {
         PairingRequest payload = new PairingRequest(code, deviceName, pluginVersion, runeLiteVersion);
-        HttpRequest request = HttpRequest.newBuilder(exchangeUri)
-            .timeout(Duration.ofSeconds(20))
+        Request request = new Request.Builder().url(exchangeUri.toString())
             .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload)))
+            .post(RequestBody.create(MediaType.parse("application/json"), gson.toJson(payload)))
             .build();
 
         synchronized (this)
         {
             if (closed) throw new IllegalStateException("Pairing client closed");
-            CompletableFuture<HttpResponse<String>> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+            CompletableFuture<ReplayHttpRequests.Reply> response = ReplayHttpRequests.send(httpClient, request, 20);
             pending = response;
             response.whenComplete((result, error) -> clearPending(response));
             return response.thenApply(this::parseResponse);
@@ -80,17 +73,17 @@ public final class PairingClient implements AutoCloseable
         pending = null;
     }
 
-    private PairingCredentials parseResponse(HttpResponse<String> response)
+    private PairingCredentials parseResponse(ReplayHttpRequests.Reply response)
     {
-        if (response.statusCode() != 201)
+        if (response.status != 201)
         {
-            throw new PairingException(response.statusCode());
+            throw new PairingException(response.status);
         }
 
-        PairingResponse payload = gson.fromJson(response.body(), PairingResponse.class);
+        PairingResponse payload = gson.fromJson(response.body, PairingResponse.class);
         if (payload == null || payload.device == null || payload.token == null)
         {
-            throw new PairingException(response.statusCode());
+            throw new PairingException(response.status);
         }
         return new PairingCredentials(
             payload.token,

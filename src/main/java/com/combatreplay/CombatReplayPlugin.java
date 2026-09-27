@@ -12,6 +12,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.runelite.api.Actor;
@@ -78,6 +79,7 @@ public class CombatReplayPlugin extends Plugin
 
 	@Inject private Client client;
 	@Inject private Gson gson;
+	@Inject private OkHttpClient httpClient;
 	@Inject private ClientThread clientThread;
 	@Inject private ClientToolbar clientToolbar;
 	@Inject private CombatReplayPanel panel;
@@ -207,7 +209,7 @@ public class CombatReplayPlugin extends Plugin
 		final PairingClient pairingClient;
 		try
 		{
-			pairingClient = new PairingClient(URI.create(config.webAddress()), gson);
+			pairingClient = new PairingClient(URI.create(config.webAddress()), httpClient, gson);
 		}
 		catch (IllegalArgumentException exception)
 		{
@@ -338,7 +340,7 @@ public class CombatReplayPlugin extends Plugin
 			ReplayUploadQueue queue = uploadQueues.get(recordingId);
 			if (queue == null)
 			{
-				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor, gson);
+				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), httpClient, executor, gson);
 				UploadSidecarStore sidecars = new UploadSidecarStore(gson, store.directory());
 				queue = new ReplayUploadQueue(client, sidecars, executor, token,
 					message -> panel.uploadStatusChanged(recordingId, message));

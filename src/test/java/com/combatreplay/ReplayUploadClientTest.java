@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
+import okhttp3.OkHttpClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -31,6 +32,7 @@ public class ReplayUploadClientTest
 {
     private static final String RECORDING_ID = "123e4567-e89b-42d3-a456-426614174000";
     private final Gson gson = new Gson();
+    private final OkHttpClient http = new OkHttpClient();
 
     @Rule
     public TemporaryFolder temporary = new TemporaryFolder();
@@ -78,7 +80,7 @@ public class ReplayUploadClientTest
         server.createContext("/api/v1/replays/42/complete", exchange ->
             respond(exchange, 202, response("processing")));
 
-        ReplayUploadResult result = new ReplayUploadClient(baseUri, Runnable::run, gson)
+        ReplayUploadResult result = new ReplayUploadClient(baseUri, http, Runnable::run, gson)
             .upload(source, RECORDING_ID, "42.device-secret")
             .get(5, TimeUnit.SECONDS);
 
@@ -100,10 +102,10 @@ public class ReplayUploadClientTest
             "https://[2001:db8::1]:3000", "http://localhost:3000", "http://127.0.0.1:3000",
             "http://[::1]:3000"})
         {
-            new ReplayUploadClient(URI.create(address), Runnable::run, gson);
+            new ReplayUploadClient(URI.create(address), http, Runnable::run, gson);
         }
         assertThrows(IllegalArgumentException.class,
-            () -> new ReplayUploadClient(URI.create("http://192.0.2.1:3000"), Runnable::run, gson));
+            () -> new ReplayUploadClient(URI.create("http://192.0.2.1:3000"), http, Runnable::run, gson));
     }
 
     @Test
@@ -115,7 +117,7 @@ public class ReplayUploadClientTest
 
         try
         {
-            new ReplayUploadClient(baseUri, Runnable::run, gson)
+            new ReplayUploadClient(baseUri, http, Runnable::run, gson)
                 .upload(source, RECORDING_ID, "token")
                 .get(5, TimeUnit.SECONDS);
         }
@@ -157,7 +159,7 @@ public class ReplayUploadClientTest
         java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         java.util.concurrent.CountDownLatch paused = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
-        ReplayUploadClient client = new ReplayUploadClient(baseUri, Runnable::run, gson);
+        ReplayUploadClient client = new ReplayUploadClient(baseUri, http, Runnable::run, gson);
         try (ReplayUploadQueue queue = new ReplayUploadQueue(client, sidecars, executor, "token", message ->
         {
             if (message.startsWith("Storage full")) paused.countDown();
@@ -173,7 +175,7 @@ public class ReplayUploadClientTest
             assertEquals(1, requests.get());
             assertTrue(Files.exists(source));
             // A fresh queue also respects the persisted pause, including after a restart.
-            try (ReplayUploadQueue resumed = new ReplayUploadQueue(new ReplayUploadClient(baseUri, Runnable::run, gson), sidecars, executor, "token"))
+            try (ReplayUploadQueue resumed = new ReplayUploadQueue(new ReplayUploadClient(baseUri, http, Runnable::run, gson), sidecars, executor, "token"))
             {
                 resumed.enqueue(source, RECORDING_ID);
                 executor.submit(() -> { }).get(5, TimeUnit.SECONDS);

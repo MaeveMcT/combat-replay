@@ -5,6 +5,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 
 import com.google.gson.Gson;
@@ -12,11 +13,10 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okio.Timeout;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -27,6 +27,7 @@ import org.junit.Test;
 public class PairingClientTest
 {
     private final Gson gson = new Gson();
+    private final OkHttpClient http = new OkHttpClient();
     private HttpServer server;
     private URI baseUri;
 
@@ -51,33 +52,31 @@ public class PairingClientTest
             "https://[2001:db8::1]:3000", "http://localhost:3000", "http://127.0.0.1:3000",
             "http://[::1]:3000"})
         {
-            new PairingClient(URI.create(address), gson);
+            new PairingClient(URI.create(address), http, gson);
         }
         assertThrows(IllegalArgumentException.class,
-            () -> new PairingClient(URI.create("http://192.0.2.1:3000"), gson));
+            () -> new PairingClient(URI.create("http://192.0.2.1:3000"), http, gson));
     }
 
     @Test
     public void pairingRequestHasTimeoutAndCanBeCancelledOnShutdown()
     {
-        HttpClient http = mock(HttpClient.class);
-        CompletableFuture<HttpResponse<String>> pending = new CompletableFuture<>();
-        when(http.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(invocation ->
-        {
-            HttpRequest request = invocation.getArgument(0);
-            assertEquals(Duration.ofSeconds(20), request.timeout().orElseThrow());
-            return pending;
-        });
-        PairingClient client = new PairingClient(baseUri, http, gson);
+        OkHttpClient mockHttp = mock(OkHttpClient.class);
+        Call call = mock(Call.class);
+        Timeout timeout = new Timeout();
+        when(mockHttp.newCall(any(Request.class))).thenReturn(call);
+        when(call.timeout()).thenReturn(timeout);
+        PairingClient client = new PairingClient(baseUri, mockHttp, gson);
         client.exchange("CODE", "desktop", "1", "1");
+        assertEquals(TimeUnit.SECONDS.toNanos(20), timeout.timeoutNanos());
         client.close();
-        assertTrue(pending.isCancelled());
+        verify(call).cancel();
     }
 
     @Test
     public void closedPairingClientRejectsNewRequests()
     {
-        PairingClient client = new PairingClient(baseUri, gson);
+        PairingClient client = new PairingClient(baseUri, http, gson);
         client.close();
         assertThrows(IllegalStateException.class,
             () -> client.exchange("CODE", "desktop", "1", "1"));
@@ -99,7 +98,7 @@ public class PairingClientTest
             exchange.close();
         });
 
-        PairingClient client = new PairingClient(baseUri, gson);
+        PairingClient client = new PairingClient(baseUri, http, gson);
         PairingCredentials credentials = client.exchange(
             "ABCDE-FG234", "Gaming desktop", "1.0.0", "1.11.0")
             .get(5, TimeUnit.SECONDS);

@@ -6,9 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.DigestInputStream;
@@ -18,26 +15,25 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.zip.GZIPOutputStream;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
 
 public final class ReplayUploadClient implements AutoCloseable
 {
     private final Gson gson;
     private final URI baseUri;
-    private final HttpClient httpClient;
+    private final OkHttpClient httpClient;
     private final Executor preparationExecutor;
     private volatile boolean closed;
     private final java.util.Set<CompletableFuture<?>> requests = new java.util.HashSet<>();
 
-    public ReplayUploadClient(URI baseUri, Executor preparationExecutor, Gson gson)
-    {
-        this(baseUri, HttpClient.newHttpClient(), preparationExecutor, gson);
-    }
-
-    ReplayUploadClient(URI baseUri, HttpClient httpClient, Executor preparationExecutor, Gson gson)
+    public ReplayUploadClient(URI baseUri, OkHttpClient httpClient, Executor preparationExecutor, Gson gson)
     {
         validateBaseUri(baseUri);
         this.baseUri = baseUri;
-        this.httpClient = httpClient;
+        this.httpClient = java.util.Objects.requireNonNull(httpClient);
         this.preparationExecutor = preparationExecutor;
         this.gson = java.util.Objects.requireNonNull(gson);
     }
@@ -53,56 +49,45 @@ public final class ReplayUploadClient implements AutoCloseable
 
     public CompletableFuture<ReplayUploadResult> status(long replayId, String token)
     {
-        HttpRequest request = request(apiUri("/api/v1/replays/" + replayId), token).GET().build();
+        Request request = request(apiUri("/api/v1/replays/" + replayId), token).get().build();
         return send(request, 200);
     }
 
     private CompletableFuture<ReplayResponse> create(String recordingId, String token, PreparedReplay prepared)
     {
         CreateRequest payload = new CreateRequest(recordingId, prepared.sha256, prepared.byteSize);
-        HttpRequest request = request(apiUri("/api/v1/replays"), token)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload)))
+        Request request = request(apiUri("/api/v1/replays"), token)
+            .post(RequestBody.create(MediaType.parse("application/json"), gson.toJson(payload)))
             .build();
         return sendResponse(request, 200, 201);
     }
 
     private CompletableFuture<ReplayResponse> transfer(long replayId, String token, PreparedReplay prepared)
     {
-        final HttpRequest.BodyPublisher body;
-        try
-        {
-            body = HttpRequest.BodyPublishers.ofFile(prepared.path);
-        }
-        catch (IOException exception)
-        {
-            return failed(new ReplayUploadException("Unable to read prepared replay", 0, exception));
-        }
-        HttpRequest request = request(apiUri("/api/v1/replays/" + replayId + "/upload"), token)
-            .header("Content-Type", "application/gzip")
+        Request request = request(apiUri("/api/v1/replays/" + replayId + "/upload"), token)
             .header("Content-Encoding", "gzip")
-            .PUT(body)
+            .put(RequestBody.create(MediaType.parse("application/gzip"), prepared.path.toFile()))
             .build();
         return sendResponse(request, 200);
     }
 
     private CompletableFuture<ReplayUploadResult> complete(long replayId, String token)
     {
-        HttpRequest request = request(apiUri("/api/v1/replays/" + replayId + "/complete"), token)
-            .POST(HttpRequest.BodyPublishers.noBody())
+        Request request = request(apiUri("/api/v1/replays/" + replayId + "/complete"), token)
+            .post(RequestBody.create(null, new byte[0]))
             .build();
         return send(request, 202);
     }
 
-    private CompletableFuture<ReplayUploadResult> send(HttpRequest request, int... expectedStatuses)
+    private CompletableFuture<ReplayUploadResult> send(Request request, int... expectedStatuses)
     {
         return sendResponse(request, expectedStatuses).thenApply(ReplayResponse::result);
     }
 
-    private synchronized CompletableFuture<ReplayResponse> sendResponse(HttpRequest request, int... expectedStatuses)
+    private synchronized CompletableFuture<ReplayResponse> sendResponse(Request request, int... expectedStatuses)
     {
         if (closed) return failed(new ReplayUploadException("Upload client closed", 0));
-        CompletableFuture<HttpResponse<String>> pending = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        CompletableFuture<ReplayHttpRequests.Reply> pending = ReplayHttpRequests.send(httpClient, request, 0);
         requests.add(pending);
         pending.whenComplete((response, error) -> removeRequest(pending));
         return pending.handle((response, error) ->
@@ -114,15 +99,15 @@ public final class ReplayUploadClient implements AutoCloseable
                 boolean expected = false;
                 for (int status : expectedStatuses)
                 {
-                    expected |= response.statusCode() == status;
+                    expected |= response.status == status;
                 }
                 if (!expected)
                 {
                     String code = null;
                     try
                     {
-                        ErrorResponse failure = gson.fromJson(response.body(), ErrorResponse.class);
-                        if (response.statusCode() == 409 && failure != null)
+                        ErrorResponse failure = gson.fromJson(response.body, ErrorResponse.class);
+                        if (response.status == 409 && failure != null)
                         {
                             code = failure.error;
                         }
@@ -132,10 +117,10 @@ public final class ReplayUploadClient implements AutoCloseable
                         // Error pages are not necessarily JSON; retain only the status.
                     }
                     throw new CompletionException(new ReplayUploadException(
-                        "Replay upload request failed with HTTP status " + response.statusCode(), response.statusCode())
+                        "Replay upload request failed with HTTP status " + response.status, response.status)
                         .withFailureCode(code));
                 }
-                ReplayResponse payload = gson.fromJson(response.body(), ReplayResponse.class);
+                ReplayResponse payload = gson.fromJson(response.body, ReplayResponse.class);
                 if (payload == null || payload.id <= 0 || payload.recordingId == null || payload.status == null)
                 {
                     throw new CompletionException(new ReplayUploadException("Replay upload response was invalid", 0));
@@ -157,9 +142,9 @@ public final class ReplayUploadClient implements AutoCloseable
         requests.clear();
     }
 
-    private HttpRequest.Builder request(URI uri, String token)
+    private Request.Builder request(URI uri, String token)
     {
-        return HttpRequest.newBuilder(uri)
+        return new Request.Builder().url(uri.toString())
             .header("Accept", "application/json")
             .header("Authorization", "Bearer " + token);
     }
