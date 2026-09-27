@@ -21,24 +21,25 @@ import java.util.zip.GZIPOutputStream;
 
 public final class ReplayUploadClient implements AutoCloseable
 {
-    private static final Gson GSON = new Gson();
+    private final Gson gson;
     private final URI baseUri;
     private final HttpClient httpClient;
     private final Executor preparationExecutor;
     private volatile boolean closed;
     private final java.util.Set<CompletableFuture<?>> requests = new java.util.HashSet<>();
 
-    public ReplayUploadClient(URI baseUri, Executor preparationExecutor)
+    public ReplayUploadClient(URI baseUri, Executor preparationExecutor, Gson gson)
     {
-        this(baseUri, HttpClient.newHttpClient(), preparationExecutor);
+        this(baseUri, HttpClient.newHttpClient(), preparationExecutor, gson);
     }
 
-    ReplayUploadClient(URI baseUri, HttpClient httpClient, Executor preparationExecutor)
+    ReplayUploadClient(URI baseUri, HttpClient httpClient, Executor preparationExecutor, Gson gson)
     {
         validateBaseUri(baseUri);
         this.baseUri = baseUri;
         this.httpClient = httpClient;
         this.preparationExecutor = preparationExecutor;
+        this.gson = java.util.Objects.requireNonNull(gson);
     }
 
     public CompletableFuture<ReplayUploadResult> upload(Path source, String recordingId, String token)
@@ -61,7 +62,7 @@ public final class ReplayUploadClient implements AutoCloseable
         CreateRequest payload = new CreateRequest(recordingId, prepared.sha256, prepared.byteSize);
         HttpRequest request = request(apiUri("/api/v1/replays"), token)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
+            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload)))
             .build();
         return sendResponse(request, 200, 201);
     }
@@ -120,7 +121,7 @@ public final class ReplayUploadClient implements AutoCloseable
                     String code = null;
                     try
                     {
-                        ErrorResponse failure = GSON.fromJson(response.body(), ErrorResponse.class);
+                        ErrorResponse failure = gson.fromJson(response.body(), ErrorResponse.class);
                         if (response.statusCode() == 409 && failure != null)
                         {
                             code = failure.error;
@@ -134,7 +135,7 @@ public final class ReplayUploadClient implements AutoCloseable
                         "Replay upload request failed with HTTP status " + response.statusCode(), response.statusCode())
                         .withFailureCode(code));
                 }
-                ReplayResponse payload = GSON.fromJson(response.body(), ReplayResponse.class);
+                ReplayResponse payload = gson.fromJson(response.body(), ReplayResponse.class);
                 if (payload == null || payload.id <= 0 || payload.recordingId == null || payload.status == null)
                 {
                     throw new CompletionException(new ReplayUploadException("Replay upload response was invalid", 0));

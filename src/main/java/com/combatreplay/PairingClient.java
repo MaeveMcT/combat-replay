@@ -12,22 +12,23 @@ import java.util.concurrent.CompletableFuture;
 
 public final class PairingClient implements AutoCloseable
 {
-    private static final Gson GSON = new Gson();
+    private final Gson gson;
     private final URI exchangeUri;
     private final HttpClient httpClient;
     private volatile boolean closed;
     private CompletableFuture<?> pending;
 
-    public PairingClient(URI baseUri)
+    public PairingClient(URI baseUri, Gson gson)
     {
-        this(baseUri, HttpClient.newHttpClient());
+        this(baseUri, HttpClient.newHttpClient(), gson);
     }
 
-    PairingClient(URI baseUri, HttpClient httpClient)
+    PairingClient(URI baseUri, HttpClient httpClient, Gson gson)
     {
         validateBaseUri(baseUri);
         exchangeUri = baseUri.resolve("/api/v1/pairing/exchange");
         this.httpClient = httpClient;
+        this.gson = Objects.requireNonNull(gson);
     }
 
     private static void validateBaseUri(URI uri)
@@ -53,7 +54,7 @@ public final class PairingClient implements AutoCloseable
             .timeout(Duration.ofSeconds(20))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
+            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload)))
             .build();
 
         synchronized (this)
@@ -86,7 +87,7 @@ public final class PairingClient implements AutoCloseable
             throw new PairingException(response.statusCode());
         }
 
-        PairingResponse payload = GSON.fromJson(response.body(), PairingResponse.class);
+        PairingResponse payload = gson.fromJson(response.body(), PairingResponse.class);
         if (payload == null || payload.device == null || payload.token == null)
         {
             throw new PairingException(response.statusCode());

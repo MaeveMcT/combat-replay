@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 
+import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -25,6 +26,7 @@ import org.junit.Test;
 
 public class PairingClientTest
 {
+    private final Gson gson = new Gson();
     private HttpServer server;
     private URI baseUri;
 
@@ -49,10 +51,10 @@ public class PairingClientTest
             "https://[2001:db8::1]:3000", "http://localhost:3000", "http://127.0.0.1:3000",
             "http://[::1]:3000"})
         {
-            new PairingClient(URI.create(address));
+            new PairingClient(URI.create(address), gson);
         }
         assertThrows(IllegalArgumentException.class,
-            () -> new PairingClient(URI.create("http://192.0.2.1:3000")));
+            () -> new PairingClient(URI.create("http://192.0.2.1:3000"), gson));
     }
 
     @Test
@@ -66,7 +68,7 @@ public class PairingClientTest
             assertEquals(Duration.ofSeconds(20), request.timeout().orElseThrow());
             return pending;
         });
-        PairingClient client = new PairingClient(baseUri, http);
+        PairingClient client = new PairingClient(baseUri, http, gson);
         client.exchange("CODE", "desktop", "1", "1");
         client.close();
         assertTrue(pending.isCancelled());
@@ -75,7 +77,7 @@ public class PairingClientTest
     @Test
     public void closedPairingClientRejectsNewRequests()
     {
-        PairingClient client = new PairingClient(baseUri);
+        PairingClient client = new PairingClient(baseUri, gson);
         client.close();
         assertThrows(IllegalStateException.class,
             () -> client.exchange("CODE", "desktop", "1", "1"));
@@ -97,7 +99,7 @@ public class PairingClientTest
             exchange.close();
         });
 
-        PairingClient client = new PairingClient(baseUri);
+        PairingClient client = new PairingClient(baseUri, gson);
         PairingCredentials credentials = client.exchange(
             "ABCDE-FG234", "Gaming desktop", "1.0.0", "1.11.0")
             .get(5, TimeUnit.SECONDS);

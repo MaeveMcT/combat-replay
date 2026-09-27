@@ -77,6 +77,7 @@ public class CombatReplayPlugin extends Plugin
 	private static final Logger log = LoggerFactory.getLogger(CombatReplayPlugin.class);
 
 	@Inject private Client client;
+	@Inject private Gson gson;
 	@Inject private ClientThread clientThread;
 	@Inject private ClientToolbar clientToolbar;
 	@Inject private CombatReplayPanel panel;
@@ -119,7 +120,7 @@ public class CombatReplayPlugin extends Plugin
 		{
 			try
 			{
-				UploadSidecarState state = new UploadSidecarStore(new Gson(), store.directory())
+				UploadSidecarState state = new UploadSidecarStore(gson, store.directory())
 					.load(selected.recordingId);
 				if (active) panel.uploadStatusChanged(selected.recordingId, ReplayUploadQueue.message(state));
 			}
@@ -206,7 +207,7 @@ public class CombatReplayPlugin extends Plugin
 		final PairingClient pairingClient;
 		try
 		{
-			pairingClient = new PairingClient(URI.create(config.webAddress()));
+			pairingClient = new PairingClient(URI.create(config.webAddress()), gson);
 		}
 		catch (IllegalArgumentException exception)
 		{
@@ -337,8 +338,8 @@ public class CombatReplayPlugin extends Plugin
 			ReplayUploadQueue queue = uploadQueues.get(recordingId);
 			if (queue == null)
 			{
-				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor);
-				UploadSidecarStore sidecars = new UploadSidecarStore(new Gson(), store.directory());
+				ReplayUploadClient client = new ReplayUploadClient(URI.create(config.webAddress()), executor, gson);
+				UploadSidecarStore sidecars = new UploadSidecarStore(gson, store.directory());
 				queue = new ReplayUploadQueue(client, sidecars, executor, token,
 					message -> panel.uploadStatusChanged(recordingId, message));
 				uploadQueues.put(recordingId, queue);
