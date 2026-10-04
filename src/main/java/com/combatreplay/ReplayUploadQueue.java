@@ -1,8 +1,7 @@
 package com.combatreplay;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -26,6 +25,7 @@ final class ReplayUploadQueue implements AutoCloseable
     private final AtomicBoolean running = new AtomicBoolean();
     private volatile boolean closed;
     private CompletableFuture<?> request;
+    private Filepath source;
     private ScheduledFuture<?> scheduled;
 
     ReplayUploadQueue(ReplayUploadClient client, UploadSidecarStore sidecars,
@@ -44,12 +44,12 @@ final class ReplayUploadQueue implements AutoCloseable
         this.statusChanged = statusChanged;
     }
 
-    void enqueue(Path source, String recordingId)
+    void enqueue(Filepath source, String recordingId)
     {
         enqueue(source, recordingId, false);
     }
 
-    void enqueue(Path source, String recordingId, boolean manualRetry)
+    void enqueue(Filepath source, String recordingId, boolean manualRetry)
     {
         if (closed || !running.compareAndSet(false, true)) return;
         executor.execute(() ->
@@ -60,7 +60,7 @@ final class ReplayUploadQueue implements AutoCloseable
                 UploadSidecarState state = sidecars.load(recordingId);
                 if (state == null)
                 {
-                    state = new UploadSidecarState(recordingId, source.toAbsolutePath().toString());
+                    state = new UploadSidecarState(recordingId, source.getFileName());
                 }
                 if (!manualRetry && ("ready".equals(state.status) || "paused".equals(state.status)))
                 {
@@ -68,7 +68,9 @@ final class ReplayUploadQueue implements AutoCloseable
                     statusChanged.accept(message(state));
                     return;
                 }
-                state.sourcePath = source.toAbsolutePath().toString();
+                // Retry the validated library selection, never a path read from the sidecar.
+                this.source = source;
+                state.sourcePath = source.getFileName();
                 attempt(state);
             }
             catch (IOException | RuntimeException exception)
@@ -82,8 +84,7 @@ final class ReplayUploadQueue implements AutoCloseable
     private synchronized void attempt(UploadSidecarState state)
     {
         if (closed) return;
-        Path source = Path.of(state.sourcePath);
-        if (!Files.isRegularFile(source))
+        if (!source.isFile())
         {
             state.status = "failed";
             state.failureCode = "local_source_missing";

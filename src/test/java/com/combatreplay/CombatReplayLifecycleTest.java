@@ -26,7 +26,7 @@ public class CombatReplayLifecycleTest
         when(recorder.isRecording()).thenReturn(true);
         when(recorder.tickCount()).thenReturn(CombatRecorder.MAX_TICKS);
         when(recorder.stop()).thenReturn(recording);
-        when(store.save(recording)).thenReturn(Paths.get("recording.json"));
+        when(store.save(recording)).thenReturn(TestFilepaths.filepath(Paths.get("recording.json")));
         org.mockito.Mockito.doAnswer(invocation ->
         {
             invocation.<Runnable>getArgument(0).run();
@@ -58,7 +58,7 @@ public class CombatReplayLifecycleTest
         CombatRecording recording = recordingWithOneTick();
         when(recorder.isRecording()).thenReturn(true);
         when(recorder.stop()).thenReturn(recording);
-        when(store.save(recording)).thenReturn(Paths.get("recording.json"));
+        when(store.save(recording)).thenReturn(TestFilepaths.filepath(Paths.get("recording.json")));
         org.mockito.Mockito.doAnswer(invocation ->
         {
             invocation.<Runnable>getArgument(0).run();

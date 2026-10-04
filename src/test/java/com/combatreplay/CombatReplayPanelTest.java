@@ -47,8 +47,8 @@ public class CombatReplayPanelTest
 		RecordingStore store = mock(RecordingStore.class);
 		CountDownLatch started = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		StoredRecording first = new StoredRecording(Path.of("first.json"), "first");
-		StoredRecording second = new StoredRecording(Path.of("second.json"), "second");
+		StoredRecording first = new StoredRecording(TestFilepaths.filepath(Path.of("first.json")), "first");
+		StoredRecording second = new StoredRecording(TestFilepaths.filepath(Path.of("second.json")), "second");
 		when(store.list()).thenAnswer(invocation ->
 		{
 			assertFalse(SwingUtilities.isEventDispatchThread());

@@ -39,9 +39,9 @@ public class ReplayV1FormatTest
     public void writesVersionOneEnvelopeWithStableRecordingIdentity() throws Exception
     {
         CombatRecording completed = completedRecording();
-        RecordingStore store = new RecordingStore(new Gson(), temporary.newFolder().toPath());
+        RecordingStore store = new RecordingStore(new Gson(), net.runelite.client.util.Filepath.Unchecked.getRooted(temporary.newFolder().toPath()));
 
-        Path path = store.save(completed);
+        Path path = net.runelite.client.util.Filepath.Unchecked.getPath(store.save(completed));
         JsonObject json;
         try (Reader reader = Files.newBufferedReader(path))
         {

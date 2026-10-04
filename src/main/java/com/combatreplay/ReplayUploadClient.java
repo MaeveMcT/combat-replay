@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
+import okio.BufferedSink;
+import okio.Okio;
+import okio.Source;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -38,7 +40,7 @@ public final class ReplayUploadClient implements AutoCloseable
         this.gson = java.util.Objects.requireNonNull(gson);
     }
 
-    public CompletableFuture<ReplayUploadResult> upload(Path source, String recordingId, String token)
+    public CompletableFuture<ReplayUploadResult> upload(Filepath source, String recordingId, String token)
     {
         return CompletableFuture.supplyAsync(() -> prepare(source), preparationExecutor)
             .thenCompose(prepared -> create(recordingId, token, prepared)
@@ -66,7 +68,29 @@ public final class ReplayUploadClient implements AutoCloseable
     {
         Request request = request(apiUri("/api/v1/replays/" + replayId + "/upload"), token)
             .header("Content-Encoding", "gzip")
-            .put(RequestBody.create(MediaType.parse("application/gzip"), prepared.path.toFile()))
+            .put(new RequestBody()
+            {
+                @Override
+                public MediaType contentType()
+                {
+                    return MediaType.parse("application/gzip");
+                }
+
+                @Override
+                public long contentLength()
+                {
+                    return prepared.byteSize;
+                }
+
+                @Override
+                public void writeTo(BufferedSink sink) throws IOException
+                {
+                    try (Source source = Okio.source(prepared.path.openInputStream()))
+                    {
+                        sink.writeAll(source);
+                    }
+                }
+            })
             .build();
         return sendResponse(request, 200);
     }
@@ -166,14 +190,14 @@ public final class ReplayUploadClient implements AutoCloseable
         }
     }
 
-    private PreparedReplay prepare(Path source)
+    private PreparedReplay prepare(Filepath source)
     {
-        Path compressed = null;
+        Filepath compressed = null;
         try
         {
-            compressed = Files.createTempFile("combat-replay-upload-", ".json.gz");
-            try (InputStream input = Files.newInputStream(source);
-                 OutputStream output = new GZIPOutputStream(Files.newOutputStream(compressed)))
+            compressed = source.getParent().createTempFile("combat-replay-upload-", ".json.gz");
+            try (InputStream input = source.openInputStream();
+                 OutputStream output = new GZIPOutputStream(compressed.openOutputStream()))
             {
                 byte[] buffer = new byte[64 * 1024];
                 int read;
@@ -185,7 +209,7 @@ public final class ReplayUploadClient implements AutoCloseable
             }
 
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream input = new DigestInputStream(Files.newInputStream(compressed), digest))
+            try (InputStream input = new DigestInputStream(compressed.openInputStream(), digest))
             {
                 byte[] buffer = new byte[64 * 1024];
                 while (input.read(buffer) >= 0)
@@ -194,7 +218,7 @@ public final class ReplayUploadClient implements AutoCloseable
                     // DigestInputStream updates the checksum while the prepared file is consumed.
                 }
             }
-            return new PreparedReplay(compressed, hex(digest.digest()), Files.size(compressed));
+            return new PreparedReplay(compressed, hex(digest.digest()), compressed.size());
         }
         catch (IOException | NoSuchAlgorithmException exception)
         {
@@ -202,7 +226,7 @@ public final class ReplayUploadClient implements AutoCloseable
             {
                 try
                 {
-                    Files.deleteIfExists(compressed);
+                    compressed.deleteIfExists();
                 }
                 catch (IOException ignored)
                 {
@@ -232,11 +256,11 @@ public final class ReplayUploadClient implements AutoCloseable
 
     private static final class PreparedReplay
     {
-        private final Path path;
+        private final Filepath path;
         private final String sha256;
         private final long byteSize;
 
-        private PreparedReplay(Path path, String sha256, long byteSize)
+        private PreparedReplay(Filepath path, String sha256, long byteSize)
         {
             this.path = path;
             this.sha256 = sha256;
@@ -247,11 +271,11 @@ public final class ReplayUploadClient implements AutoCloseable
         {
             try
             {
-                Files.deleteIfExists(path);
+                path.deleteIfExists();
             }
             catch (IOException ignored)
             {
-                // Temporary upload files are also eligible for operating-system cleanup.
+                // Cleanup is best effort if the filesystem is unavailable.
             }
         }
     }

@@ -7,9 +7,7 @@ import com.google.gson.stream.JsonReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,47 +15,41 @@ import java.util.List;
 import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import net.runelite.client.RuneLite;
 
 @Singleton
 final class RecordingStore
 {
 	private final Gson gson;
-	private final Path directory;
+	private final Filepath directory;
 
 	@Inject
-	RecordingStore(Gson gson)
-	{
-		this(gson, RuneLite.RUNELITE_DIR.toPath().resolve("combat-replay"));
-	}
-
-	RecordingStore(Gson gson, Path directory)
+	RecordingStore(Gson gson, Filepath directory)
 	{
 		this.gson = gson.newBuilder().serializeNulls().create();
 		this.directory = directory;
 	}
 
-	Path directory()
+	Filepath directory()
 	{
 		return directory;
 	}
 
-	Path save(CombatRecording recording) throws IOException
+	Filepath save(CombatRecording recording) throws IOException
 	{
-		Files.createDirectories(directory());
+		directory().createDirectories();
 		String stem = safeFileName(recording.name == null ? "Combat replay" : recording.name);
-		Path destination = uniquePath(directory(), stem);
+		Filepath destination = uniquePath(directory(), stem);
 		write(recording, destination);
 		return destination;
 	}
 
 	List<StoredRecording> list() throws IOException
 	{
-		Files.createDirectories(directory());
+		directory().createDirectories();
 		List<StoredRecording> recordings = new ArrayList<>();
-		try (Stream<Path> paths = Files.list(directory()))
+		try (Stream<Filepath> paths = directory().walk(1))
 		{
-			paths.filter(path -> path.getFileName().toString().endsWith(".json"))
+			paths.filter(path -> path.isFile() && path.getFileName().endsWith(".json"))
 				.sorted(Comparator.comparingLong(this::modified).reversed())
 				.forEach(path -> {
 					try
@@ -73,9 +65,9 @@ final class RecordingStore
 		return recordings;
 	}
 
-	CombatRecording load(Path path) throws IOException
+	CombatRecording load(Filepath path) throws IOException
 	{
-		try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8))
+		try (Reader reader = path.openBufferedReader())
 		{
 			JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
 			return ReplayV1Format.decode(root);
@@ -84,22 +76,22 @@ final class RecordingStore
 
 	StoredRecording rename(StoredRecording stored, String name) throws IOException
 	{
-		Path destination = uniquePath(directory(), safeFileName(name));
+		Filepath destination = uniquePath(directory(), safeFileName(name));
 		// A local rename must not change the upload bytes for this recording ID.
-		Files.move(stored.path, destination);
+		stored.path.moveTo(destination);
 		return new StoredRecording(destination, stored.recordingId);
 	}
 
 	void delete(StoredRecording recording) throws IOException
 	{
-		Files.deleteIfExists(recording.path);
+		recording.path.deleteIfExists();
 	}
 
-	private String recordingId(Path path) throws IOException
+	private String recordingId(Filepath path) throws IOException
 	{
 		String id = null;
 		int version = -1;
-		try (JsonReader reader = new JsonReader(Files.newBufferedReader(path, StandardCharsets.UTF_8)))
+		try (JsonReader reader = new JsonReader(path.openBufferedReader()))
 		{
 			reader.beginObject();
 			while (reader.hasNext())
@@ -121,35 +113,35 @@ final class RecordingStore
 		return id;
 	}
 
-	private void write(CombatRecording recording, Path destination) throws IOException
+	private void write(CombatRecording recording, Filepath destination) throws IOException
 	{
-		Path temporary = Files.createTempFile(directory(), "combat-replay-", ".tmp");
+		Filepath temporary = directory().createTempFile("combat-replay-", ".tmp");
 		try
 		{
-			try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
+			try (Writer writer = temporary.openBufferedWriter())
 			{
 				ReplayV1Format.write(recording, gson, writer);
 			}
 			try
 			{
-				Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
+				temporary.moveTo(destination, StandardCopyOption.ATOMIC_MOVE);
 			}
 			catch (IOException exception)
 			{
-				Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+				temporary.moveTo(destination, StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
 		finally
 		{
-			Files.deleteIfExists(temporary);
+			temporary.deleteIfExists();
 		}
 	}
 
-	private long modified(Path path)
+	private long modified(Filepath path)
 	{
 		try
 		{
-			return Files.getLastModifiedTime(path).toMillis();
+			return path.getLastModifiedTime().toMillis();
 		}
 		catch (IOException ignored)
 		{
@@ -159,7 +151,7 @@ final class RecordingStore
 
 	private static String safeFileName(String value)
 	{
-		String safe = value.replaceAll("[\\\\/:*?\"<>|]", "-").replaceAll("\\s+", " ").trim();
+		String safe = value.replaceAll("[\\x00-\\x1f\\\\/:*?\"<>|~]", "-").replaceAll("\\s+", " ").trim();
 		if (safe.isEmpty())
 		{
 			safe = "Combat replay";
@@ -167,12 +159,22 @@ final class RecordingStore
 		return safe.length() > 100 ? safe.substring(0, 100).trim() : safe;
 	}
 
-	private static Path uniquePath(Path directory, String stem)
+	private static Filepath uniquePath(Filepath directory, String stem)
 	{
-		Path candidate = directory.resolve(stem + ".json");
-		for (int suffix = 2; Files.exists(candidate); suffix++)
+		Filepath candidate;
+		try
 		{
-			candidate = directory.resolve(stem + "-" + suffix + ".json");
+			candidate = directory.joinSegment(stem + ".json");
+		}
+		catch (IllegalArgumentException exception)
+		{
+			// Prefix Windows device names (including names with extensions).
+			stem = "Replay-" + stem;
+			candidate = directory.joinSegment(stem + ".json");
+		}
+		for (int suffix = 2; candidate.exists(); suffix++)
+		{
+			candidate = directory.joinSegment(stem + "-" + suffix + ".json");
 		}
 		return candidate;
 	}

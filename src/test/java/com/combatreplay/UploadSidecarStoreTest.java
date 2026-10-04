@@ -20,7 +20,7 @@ public class UploadSidecarStoreTest
     public void persistsUploadProgressByRecordingIdWithoutCredentials() throws Exception
     {
         Path recordings = temporary.newFolder("recordings").toPath();
-        UploadSidecarStore store = new UploadSidecarStore(new Gson(), recordings);
+        UploadSidecarStore store = new UploadSidecarStore(new Gson(), net.runelite.client.util.Filepath.Unchecked.getRooted(recordings));
         String recordingId = "123e4567-e89b-42d3-a456-426614174000";
         UploadSidecarState state = new UploadSidecarState(recordingId,
             recordings.resolve("local.json").toString());

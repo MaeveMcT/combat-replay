@@ -9,7 +9,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import okhttp3.OkHttpClient;
@@ -70,6 +70,7 @@ import net.runelite.client.util.Text;
 
 @PluginDescriptor(
 	name = "Combat Replay",
+	internalName = "combat-replay",
 	description = "Records combat observations for private web replay uploads",
 	tags = {"combat", "replay", "boss", "pvm", "recording"}
 )
@@ -94,6 +95,12 @@ public class CombatReplayPlugin extends Plugin
 	private volatile PairingClient pendingPairing;
 	private volatile boolean active;
 	private final java.util.Map<String, ReplayUploadQueue> uploadQueues = new java.util.HashMap<>();
+
+	@Provides
+	Filepath provideRecordingDirectory() throws IOException
+	{
+		return getPluginDirectory();
+	}
 
 	@Provides
 	CombatReplayConfig provideConfig(ConfigManager manager)
@@ -262,7 +269,7 @@ public class CombatReplayPlugin extends Plugin
 		{
 			try
 			{
-				Path path = store.save(recording);
+				Filepath path = store.save(recording);
 				log.debug("Saved combat recording");
 				writeDiagnostics(diagnostics);
 				queueUpload(path, recording.recordingId);
@@ -303,7 +310,7 @@ public class CombatReplayPlugin extends Plugin
 		}
 	}
 
-	private void queueUpload(Path path, String recordingId)
+	private void queueUpload(Filepath path, String recordingId)
 	{
 		queueUpload(path, recordingId, false);
 	}
@@ -326,7 +333,7 @@ public class CombatReplayPlugin extends Plugin
 		uploadQueues.clear();
 	}
 
-	private synchronized void queueUpload(Path path, String recordingId, boolean manualRetry)
+	private synchronized void queueUpload(Filepath path, String recordingId, boolean manualRetry)
 	{
 		if (!active) return;
 		String token = config.deviceToken();

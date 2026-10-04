@@ -5,8 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.Reader;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
 import java.util.Collections;
 import org.junit.Rule;
 import org.junit.Test;
@@ -24,13 +23,13 @@ public class RecordingStoreTest
 	@Test
 	public void versionOneRecordingRoundTripsToCompleteTicks() throws Exception
 	{
-		Path directory = temporary.newFolder("recordings").toPath();
+		Filepath directory = Filepath.Unchecked.getRooted(temporary.newFolder("recordings").toPath());
 		RecordingStore store = new RecordingStore(new Gson(), directory);
 		CombatRecording source = recording().completed(2_000L);
 
-		Path path = store.save(source);
+		Filepath path = store.save(source);
 		CombatRecording loaded = store.load(path);
-		try (Reader reader = Files.newBufferedReader(path))
+		try (Reader reader = path.openBufferedReader())
 		{
 			assertEquals(ReplayV1Format.encode(source), new JsonParser().parse(reader));
 		}
@@ -46,7 +45,7 @@ public class RecordingStoreTest
 		assertEquals(4151, loaded.ticks.get(1).equipment.get(0).itemId);
 		assertEquals(1, loaded.ticks.get(0).sceneTiles.size());
 
-		try (Reader reader = Files.newBufferedReader(path))
+		try (Reader reader = path.openBufferedReader())
 		{
 			JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
 			assertEquals(1, root.get("format_version").getAsInt());
@@ -62,17 +61,17 @@ public class RecordingStoreTest
 	@Test
 	public void renamePreservesUploadBytesAndListingDoesNotDecodeTicks() throws Exception
 	{
-		Path directory = temporary.newFolder("library").toPath();
+		Filepath directory = Filepath.Unchecked.getRooted(temporary.newFolder("library").toPath());
 		RecordingStore store = new RecordingStore(new Gson(), directory);
-		Path path = store.save(recording().completed(2_000L));
-		byte[] original = Files.readAllBytes(path);
+		Filepath path = store.save(recording().completed(2_000L));
+		byte[] original = readBytes(path);
 		StoredRecording stored = store.list().get(0);
 		StoredRecording renamed = store.rename(stored, "Local title");
 
-		assertFalse(Files.exists(path));
+		assertFalse(path.exists());
 		assertEquals("Local title", renamed.toString());
 		assertEquals(stored.recordingId, renamed.recordingId);
-		assertTrue(java.util.Arrays.equals(original, Files.readAllBytes(renamed.path)));
+		assertTrue(java.util.Arrays.equals(original, readBytes(renamed.path)));
 		assertEquals(stored.recordingId, store.list().get(0).recordingId);
 		assertEquals(stored.recordingId, store.load(renamed.path).recordingId);
 	}
@@ -80,12 +79,43 @@ public class RecordingStoreTest
 	@Test
 	public void listingReadsOnlyMetadataWithoutDecodingTicks() throws Exception
 	{
-		Path directory = temporary.newFolder("metadata").toPath();
+		Filepath directory = Filepath.Unchecked.getRooted(temporary.newFolder("metadata").toPath());
 		String id = "123e4567-e89b-42d3-a456-426614174000";
-		Files.writeString(directory.resolve("Test.json"),
+		directory.joinSegment("Test.json").write(
 			"{\"format_version\":1,\"recording_id\":\"" + id + "\",\"ticks\":[not parsed]}");
 		RecordingStore store = new RecordingStore(new Gson(), directory);
 		assertEquals(id, store.list().get(0).recordingId);
+	}
+
+	@Test
+	public void sanitizesFilepathNamesAndKeepsUniqueRecordings() throws Exception
+	{
+		Filepath directory = Filepath.Unchecked.getRooted(temporary.newFolder("names").toPath());
+		RecordingStore store = new RecordingStore(new Gson(), directory);
+		StoredRecording stored = new StoredRecording(store.save(recording().completed(2_000L)), "id");
+		StoredRecording reserved = store.rename(stored, "CON.txt");
+		assertEquals("Replay-CON.txt.json", reserved.path.getFileName());
+		StoredRecording sanitized = store.rename(reserved, "../bad\\\\name~\u0001");
+		assertTrue(sanitized.path.startsWith(directory));
+		assertEquals("..-bad--name--.json", sanitized.path.getFileName());
+		Filepath first = store.save(recording().completed(2_000L));
+		Filepath second = store.save(recording().completed(2_000L));
+		assertFalse(first.equals(second));
+		store.delete(sanitized);
+		assertFalse(sanitized.path.exists());
+		assertEquals(2, store.list().size());
+		try (java.util.stream.Stream<Filepath> paths = directory.walk(1))
+		{
+			assertFalse(paths.anyMatch(path -> path.getFileName().endsWith(".tmp")));
+		}
+	}
+
+	private static byte[] readBytes(Filepath path) throws Exception
+	{
+		try (java.io.InputStream input = path.openInputStream())
+		{
+			return input.readAllBytes();
+		}
 	}
 
 	private static CombatRecording recording()

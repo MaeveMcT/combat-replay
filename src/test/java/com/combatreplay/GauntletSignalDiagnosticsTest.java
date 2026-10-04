@@ -143,7 +143,8 @@ public class GauntletSignalDiagnosticsTest
 	{
 		diagnostics.start(RECORDING_ID);
 		Path root = temporary.newFolder().toPath();
-		Path saved = diagnostics.stop().save(root);
+		Path saved = net.runelite.client.util.Filepath.Unchecked.getPath(diagnostics.stop()
+			.save(net.runelite.client.util.Filepath.Unchecked.getRooted(root)));
 
 		assertEquals(root.resolve(".cra-201").resolve(RECORDING_ID + ".json"), saved);
 		assertTrue(Files.exists(saved));

@@ -17,6 +17,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
+
+import static com.combatreplay.TestFilepaths.filepath;
 import java.security.MessageDigest;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -81,7 +84,7 @@ public class ReplayUploadClientTest
             respond(exchange, 202, response("processing")));
 
         ReplayUploadResult result = new ReplayUploadClient(baseUri, http, Runnable::run, gson)
-            .upload(source, RECORDING_ID, "42.device-secret")
+            .upload(filepath(source), RECORDING_ID, "42.device-secret")
             .get(5, TimeUnit.SECONDS);
 
         assertEquals(42L, result.getReplayId());
@@ -93,6 +96,7 @@ public class ReplayUploadClientTest
             createRequest.get().get("source_sha256").getAsString());
         assertEquals(sourceJson, gunzip(uploaded.get()));
         assertTrue("local recording remains available", Files.exists(source));
+        assertNoUploadTemporaryFiles();
     }
 
     @Test
@@ -118,7 +122,7 @@ public class ReplayUploadClientTest
         try
         {
             new ReplayUploadClient(baseUri, http, Runnable::run, gson)
-                .upload(source, RECORDING_ID, "token")
+                .upload(filepath(source), RECORDING_ID, "token")
                 .get(5, TimeUnit.SECONDS);
         }
         catch (java.util.concurrent.ExecutionException exception)
@@ -131,6 +135,7 @@ public class ReplayUploadClientTest
             assertTrue(cause instanceof ReplayUploadException);
             assertTrue(((ReplayUploadException) cause).isTransientFailure());
             assertEquals(503, ((ReplayUploadException) cause).getStatusCode());
+            assertNoUploadTemporaryFiles();
             return;
         }
         throw new AssertionError("Expected upload to fail");
@@ -155,7 +160,7 @@ public class ReplayUploadClientTest
         server.createContext("/api/v1/replays/42/complete", exchange -> respond(exchange, 202, response("ready")));
         Path source = temporary.newFile("quota-recording.json").toPath();
         Files.writeString(source, "{}", StandardCharsets.UTF_8);
-        UploadSidecarStore sidecars = new UploadSidecarStore(new com.google.gson.Gson(), temporary.getRoot().toPath());
+        UploadSidecarStore sidecars = new UploadSidecarStore(new com.google.gson.Gson(), Filepath.Unchecked.getRooted(temporary.getRoot().toPath()));
         java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         java.util.concurrent.CountDownLatch paused = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
@@ -166,7 +171,7 @@ public class ReplayUploadClientTest
             if (message.equals("Web replay ready")) ready.countDown();
         }))
         {
-            queue.enqueue(source, RECORDING_ID);
+            queue.enqueue(filepath(source), RECORDING_ID);
             assertTrue(paused.await(5, TimeUnit.SECONDS));
             UploadSidecarState state = sidecars.load(RECORDING_ID);
             assertEquals("paused", state.status);
@@ -177,12 +182,15 @@ public class ReplayUploadClientTest
             // A fresh queue also respects the persisted pause, including after a restart.
             try (ReplayUploadQueue resumed = new ReplayUploadQueue(new ReplayUploadClient(baseUri, http, Runnable::run, gson), sidecars, executor, "token"))
             {
-                resumed.enqueue(source, RECORDING_ID);
+                resumed.enqueue(filepath(source), RECORDING_ID);
                 executor.submit(() -> { }).get(5, TimeUnit.SECONDS);
                 assertEquals(1, requests.get());
             }
+            // A persisted path must not override the Filepath selected from the library.
+            state.sourcePath = "/outside-plugin-data/recording.json";
+            sidecars.save(state);
             full.set(false);
-            queue.enqueue(source, RECORDING_ID, true);
+            queue.enqueue(filepath(source), RECORDING_ID, true);
             assertTrue(ready.await(5, TimeUnit.SECONDS));
             assertEquals(2, requests.get());
             assertEquals("ready", sidecars.load(RECORDING_ID).status);
@@ -191,6 +199,14 @@ public class ReplayUploadClientTest
         finally
         {
             executor.shutdownNow();
+        }
+    }
+
+    private void assertNoUploadTemporaryFiles() throws IOException
+    {
+        try (java.util.stream.Stream<Path> paths = Files.list(temporary.getRoot().toPath()))
+        {
+            assertTrue(paths.noneMatch(path -> path.getFileName().toString().startsWith("combat-replay-upload-")));
         }
     }
 

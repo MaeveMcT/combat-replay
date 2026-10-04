@@ -5,9 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import net.runelite.client.util.Filepath;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -209,32 +207,32 @@ final class GauntletSignalDiagnostics
 			return json;
 		}
 
-		Path save(Path recordingDirectory) throws IOException
+		Filepath save(Filepath recordingDirectory) throws IOException
 		{
-			Path directory = recordingDirectory.resolve(".cra-201");
-			Files.createDirectories(directory);
+			Filepath directory = recordingDirectory.joinSegment(".cra-201");
+			directory.createDirectories();
 			String recordingId = json.get("recording_id").getAsString();
-			Path destination = directory.resolve(recordingId + ".json");
-			Path temporary = Files.createTempFile(directory, "cra-201-", ".tmp");
+			Filepath destination = directory.joinSegment(recordingId + ".json");
+			Filepath temporary = directory.createTempFile("cra-201-", ".tmp");
 			try
 			{
-				try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
+				try (Writer writer = temporary.openBufferedWriter())
 				{
 					gson.toJson(json, writer);
 				}
 				try
 				{
-					Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE,
+					temporary.moveTo(destination, StandardCopyOption.ATOMIC_MOVE,
 						StandardCopyOption.REPLACE_EXISTING);
 				}
 				catch (IOException exception)
 				{
-					Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+					temporary.moveTo(destination, StandardCopyOption.REPLACE_EXISTING);
 				}
 			}
 			finally
 			{
-				Files.deleteIfExists(temporary);
+				temporary.deleteIfExists();
 			}
 			return destination;
 		}
